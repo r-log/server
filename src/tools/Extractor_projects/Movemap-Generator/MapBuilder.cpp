@@ -37,25 +37,27 @@ namespace MMAP
 {
     MapBuilder::MapBuilder(float maxWalkableAngle, bool skipLiquid,
                            bool skipContinents, bool skipJunkMaps, bool skipBattlegrounds,
-                           bool debugOutput, bool bigBaseUnit, const char* offMeshFilePath) :
+                           bool debugOutput, bool bigBaseUnit, const char* offMeshFilePath,
+                           unsigned int threads) :
         m_terrainBuilder(make_unique<TerrainBuilder>(skipLiquid)),
         m_debugOutput(debugOutput),
+        m_offMeshFilePath(offMeshFilePath),
         m_skipContinents(skipContinents),
         m_skipJunkMaps(skipJunkMaps),
         m_skipBattlegrounds(skipBattlegrounds),
         m_maxWalkableAngle(maxWalkableAngle),
         m_bigBaseUnit(bigBaseUnit),
-        m_rcContext(new rcContext(false)),
-        m_offMeshFilePath(offMeshFilePath)
+        m_threads(threads ? threads : std::thread::hardware_concurrency())
     {
+        if (m_threads == 0)
+        {
+            m_threads = 1;  // fallback if hardware_concurrency() returns 0
+        }
         discoverTiles();
     }
 
     /**************************************************************************/
-    MapBuilder::~MapBuilder()
-    {
-        delete m_rcContext;
-    }
+    MapBuilder::~MapBuilder() = default;
 
     /**************************************************************************/
     void MapBuilder::discoverTiles()
@@ -203,24 +205,77 @@ namespace MMAP
 
         // now start building mmtiles for each tile
         printf("We have %u tiles.                          \n", (unsigned int)tiles->size());
-        for (set<uint32>::iterator it = tiles->begin(); it != tiles->end(); ++it)
+
+        if (m_threads <= 1)
         {
-            uint32 tileX, tileY;
-
-            // unpack tile coords
-            StaticMapTree::unpackTileID((*it), tileX, tileY);
-
-            if (shouldSkipTile(mapID, tileX, tileY))
+            // Serial path. Preserved bit-for-bit so --threads 1 produces
+            // the same output bytes as pre-Stage-4a builds.
+            for (set<uint32>::iterator it = tiles->begin(); it != tiles->end(); ++it)
             {
-                continue;
+                uint32 tileX, tileY;
+                StaticMapTree::unpackTileID((*it), tileX, tileY);
+
+                if (shouldSkipTile(mapID, tileX, tileY))
+                {
+                    continue;
+                }
+
+                buildTile(mapID, tileX, tileY, navMesh);
+            }
+        }
+        else
+        {
+            // Parallel path. The whole map's tile work is dropped on the
+            // queue before any worker starts, so workers can exit cleanly
+            // when they see an empty queue (no condvar/done-flag needed).
+            for (set<uint32>::iterator it = tiles->begin(); it != tiles->end(); ++it)
+            {
+                uint32 tileX, tileY;
+                StaticMapTree::unpackTileID((*it), tileX, tileY);
+
+                if (shouldSkipTile(mapID, tileX, tileY))
+                {
+                    continue;
+                }
+
+                m_taskQueue.push(TileTask{ mapID, tileX, tileY });
             }
 
-            buildTile(mapID, tileX, tileY, navMesh);
+            std::vector<std::thread> workers;
+            workers.reserve(m_threads);
+            for (unsigned int i = 0; i < m_threads; ++i)
+            {
+                workers.emplace_back(&MapBuilder::workerLoop, this, navMesh);
+            }
+            for (std::thread& worker : workers)
+            {
+                worker.join();
+            }
         }
 
         dtFreeNavMesh(navMesh);
 
         printf("Complete!                               \n\n");
+    }
+
+    /**************************************************************************/
+    void MapBuilder::workerLoop(dtNavMesh* navMesh)
+    {
+        while (true)
+        {
+            TileTask task;
+            {
+                std::lock_guard<std::mutex> lock(m_queueMutex);
+                if (m_taskQueue.empty())
+                {
+                    return;
+                }
+                task = m_taskQueue.front();
+                m_taskQueue.pop();
+            }
+
+            buildTile(task.mapID, task.tileX, task.tileY, navMesh);
+        }
     }
     /**************************************************************************/
     void MapBuilder::buildTile(uint32 mapID, uint32 tileX, uint32 tileY, dtNavMesh* navMesh)
@@ -410,6 +465,12 @@ namespace MMAP
         sprintf(tileString, "[%02i,%02i]: ", tileX, tileY);
         printf("%s Building movemap tiles...                        \r", tileString);
 
+        // Per-call rcContext keeps each worker thread isolated from the
+        // others. rcContext is just a log/profiler sink for Recast; the
+        // mesh output is independent of which instance is passed in, so
+        // local allocation is byte-frozen against the serial path.
+        rcContext rcCtx(false);
+
         IntermediateValues iv;
 
         float* tVerts = meshData.solidVerts.getCArray();
@@ -488,7 +549,7 @@ namespace MMAP
 
                 // build heightfield
                 tile.solid = rcAllocHeightfield();
-                if (!tile.solid || !rcCreateHeightfield(m_rcContext, *tile.solid, tileCfg.width, tileCfg.height, tileCfg.bmin, tileCfg.bmax, tileCfg.cs, tileCfg.ch))
+                if (!tile.solid || !rcCreateHeightfield(&rcCtx, *tile.solid, tileCfg.width, tileCfg.height, tileCfg.bmin, tileCfg.bmax, tileCfg.cs, tileCfg.ch))
                 {
                     printf("%s Failed building heightfield!            \n", tileString);
                     continue;
@@ -497,45 +558,45 @@ namespace MMAP
                 // mark all walkable tiles, both liquids and solids
                 unsigned char* triFlags = new unsigned char[tTriCount];
                 memset(triFlags, NAV_GROUND, tTriCount * sizeof(unsigned char));
-                rcClearUnwalkableTriangles(m_rcContext, tileCfg.walkableSlopeAngle, tVerts, tVertCount, tTris, tTriCount, triFlags);
-                rcRasterizeTriangles(m_rcContext, tVerts, tVertCount, tTris, triFlags, tTriCount, *tile.solid, config.walkableClimb);
+                rcClearUnwalkableTriangles(&rcCtx, tileCfg.walkableSlopeAngle, tVerts, tVertCount, tTris, tTriCount, triFlags);
+                rcRasterizeTriangles(&rcCtx, tVerts, tVertCount, tTris, triFlags, tTriCount, *tile.solid, config.walkableClimb);
                 delete [] triFlags;
 
-                rcFilterLowHangingWalkableObstacles(m_rcContext, config.walkableClimb, *tile.solid);
-                rcFilterLedgeSpans(m_rcContext, tileCfg.walkableHeight, tileCfg.walkableClimb, *tile.solid);
-                rcFilterWalkableLowHeightSpans(m_rcContext, tileCfg.walkableHeight, *tile.solid);
+                rcFilterLowHangingWalkableObstacles(&rcCtx, config.walkableClimb, *tile.solid);
+                rcFilterLedgeSpans(&rcCtx, tileCfg.walkableHeight, tileCfg.walkableClimb, *tile.solid);
+                rcFilterWalkableLowHeightSpans(&rcCtx, tileCfg.walkableHeight, *tile.solid);
 
-                rcRasterizeTriangles(m_rcContext, lVerts, lVertCount, lTris, lTriFlags, lTriCount, *tile.solid, config.walkableClimb);
+                rcRasterizeTriangles(&rcCtx, lVerts, lVertCount, lTris, lTriFlags, lTriCount, *tile.solid, config.walkableClimb);
 
                 // compact heightfield spans
                 tile.chf = rcAllocCompactHeightfield();
-                if (!tile.chf || !rcBuildCompactHeightfield(m_rcContext, tileCfg.walkableHeight, tileCfg.walkableClimb, *tile.solid, *tile.chf))
+                if (!tile.chf || !rcBuildCompactHeightfield(&rcCtx, tileCfg.walkableHeight, tileCfg.walkableClimb, *tile.solid, *tile.chf))
                 {
                     printf("%s Failed compacting heightfield!            \n", tileString);
                     continue;
                 }
 
                 // build polymesh intermediates
-                if (!rcErodeWalkableArea(m_rcContext, config.walkableRadius, *tile.chf))
+                if (!rcErodeWalkableArea(&rcCtx, config.walkableRadius, *tile.chf))
                 {
                     printf("%s Failed eroding area!                    \n", tileString);
                     continue;
                 }
 
-                if (!rcBuildDistanceField(m_rcContext, *tile.chf))
+                if (!rcBuildDistanceField(&rcCtx, *tile.chf))
                 {
                     printf("%s Failed building distance field!         \n", tileString);
                     continue;
                 }
 
-                if (!rcBuildRegions(m_rcContext, *tile.chf, tileCfg.borderSize, tileCfg.minRegionArea, tileCfg.mergeRegionArea))
+                if (!rcBuildRegions(&rcCtx, *tile.chf, tileCfg.borderSize, tileCfg.minRegionArea, tileCfg.mergeRegionArea))
                 {
                     printf("%s Failed building regions!                \n", tileString);
                     continue;
                 }
 
                 tile.cset = rcAllocContourSet();
-                if (!tile.cset || !rcBuildContours(m_rcContext, *tile.chf, tileCfg.maxSimplificationError, tileCfg.maxEdgeLen, *tile.cset))
+                if (!tile.cset || !rcBuildContours(&rcCtx, *tile.chf, tileCfg.maxSimplificationError, tileCfg.maxEdgeLen, *tile.cset))
                 {
                     printf("%s Failed building contours!               \n", tileString);
                     continue;
@@ -543,14 +604,14 @@ namespace MMAP
 
                 // build polymesh
                 tile.pmesh = rcAllocPolyMesh();
-                if (!tile.pmesh || !rcBuildPolyMesh(m_rcContext, *tile.cset, tileCfg.maxVertsPerPoly, *tile.pmesh))
+                if (!tile.pmesh || !rcBuildPolyMesh(&rcCtx, *tile.cset, tileCfg.maxVertsPerPoly, *tile.pmesh))
                 {
                     printf("%s Failed building polymesh!               \n", tileString);
                     continue;
                 }
 
                 tile.dmesh = rcAllocPolyMeshDetail();
-                if (!tile.dmesh || !rcBuildPolyMeshDetail(m_rcContext, *tile.pmesh, *tile.chf, tileCfg.detailSampleDist, tileCfg    .detailSampleMaxError, *tile.dmesh))
+                if (!tile.dmesh || !rcBuildPolyMeshDetail(&rcCtx, *tile.pmesh, *tile.chf, tileCfg.detailSampleDist, tileCfg    .detailSampleMaxError, *tile.dmesh))
                 {
                     printf("%s Failed building polymesh detail!        \n", tileString);
                     continue;
@@ -607,7 +668,7 @@ namespace MMAP
             delete [] tiles;
             return;
         }
-        rcMergePolyMeshes(m_rcContext, pmmerge, nmerge, *iv.polyMesh);
+        rcMergePolyMeshes(&rcCtx, pmmerge, nmerge, *iv.polyMesh);
 
         iv.polyMeshDetail = rcAllocPolyMeshDetail();
         if (!iv.polyMeshDetail)
@@ -616,7 +677,7 @@ namespace MMAP
             delete [] tiles;
             return;
         }
-        rcMergePolyMeshDetails(m_rcContext, dmmerge, nmerge, *iv.polyMeshDetail);
+        rcMergePolyMeshDetails(&rcCtx, dmmerge, nmerge, *iv.polyMeshDetail);
 
         // free things up
         delete [] pmmerge;
@@ -724,8 +785,15 @@ namespace MMAP
 
             dtTileRef tileRef = 0;
             // DT_TILE_FREE_DATA tells detour to unallocate memory when the tile
-            // is removed via removeTile()
-            dtStatus dtResult = navMesh->addTile(navData, navDataSize, DT_TILE_FREE_DATA, 0, &tileRef);
+            // is removed via removeTile(). The navMesh is shared across all
+            // worker threads of the same map; addTile/removeTile mutate its
+            // slot table and need exclusion. m_navMeshMutex is uncontended in
+            // the --threads 1 serial path so there is no overhead there.
+            dtStatus dtResult;
+            {
+                std::lock_guard<std::mutex> lock(m_navMeshMutex);
+                dtResult = navMesh->addTile(navData, navDataSize, DT_TILE_FREE_DATA, 0, &tileRef);
+            }
             if (!tileRef || dtStatusFailed(dtResult))
             {
                 printf(" Failed adding tile %s to navmesh !           \n", tileString);
@@ -741,7 +809,10 @@ namespace MMAP
                 char message[1024];
                 sprintf(message, "Failed to open %s for writing!\n", fileName);
                 perror(message);
-                navMesh->removeTile(tileRef, NULL, NULL);
+                {
+                    std::lock_guard<std::mutex> lock(m_navMeshMutex);
+                    navMesh->removeTile(tileRef, NULL, NULL);
+                }
                 continue;
             }
 
@@ -756,7 +827,10 @@ namespace MMAP
             fclose(file);
 
             // now that tile is written to disk, we can unload it
-            navMesh->removeTile(tileRef, NULL, NULL);
+            {
+                std::lock_guard<std::mutex> lock(m_navMeshMutex);
+                navMesh->removeTile(tileRef, NULL, NULL);
+            }
         }
         while (0);
 

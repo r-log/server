@@ -78,7 +78,8 @@ void printUsage()
     printf("--debugOutput [true|false] : create debugging files for use with RecastDemo\n");
     printf("--bigBaseUnit [true|false] : Generate tile/map using bigger basic unit.\n");
     printf("--silent : Make script friendly. No wait for user input, error, completion.\n");
-    printf("--offMeshInput [file.*] : Path to file containing off mesh connections data.\n\n");
+    printf("--offMeshInput [file.*] : Path to file containing off mesh connections data.\n");
+    printf("--threads [#] : Worker threads for per-map tile builds. 0=hardware_concurrency, 1=serial.\n\n");
     printf("Exemple:\nmovemapgen (generate all mmap with default arg\n"
         "movemapgen 0 (generate map 0)\n"
         "movemapgen --tile 34,46 (builds only tile 34,46 of map 0)\n\n");
@@ -97,7 +98,8 @@ bool handleArgs(int argc, char** argv,
                 bool& debugOutput,
                 bool& silent,
                 bool& bigBaseUnit,
-                char*& offMeshInputPath)
+                char*& offMeshInputPath,
+                unsigned int& threads)
 {
     char* param = NULL;
     for (int i = 1; i < argc; ++i)
@@ -288,6 +290,24 @@ bool handleArgs(int argc, char** argv,
 
             offMeshInputPath = param;
         }
+        else if (strcmp(argv[i], "--threads") == 0)
+        {
+            param = argv[++i];
+            if (!param)
+            {
+                return false;
+            }
+
+            int requested = atoi(param);
+            if (requested < 0)
+            {
+                printf("invalid option for '--threads', using default (hardware_concurrency)\n");
+            }
+            else
+            {
+                threads = static_cast<unsigned int>(requested);
+            }
+        }
         else if (strcmp(argv[i], "-?") == 0)
         {
             printUsage();
@@ -331,11 +351,12 @@ int main(int argc, char** argv)
          silent = false,
          bigBaseUnit = false;
     char* offMeshInputPath = NULL;
+    unsigned int threads = 0;  // 0 = auto (hardware_concurrency)
 
     bool validParam = handleArgs(argc, argv, mapnum,
                                  tileX, tileY, maxAngle,
                                  skipLiquid, skipContinents, skipJunkMaps, skipBattlegrounds,
-                                 debugOutput, silent, bigBaseUnit, offMeshInputPath);
+                                 debugOutput, silent, bigBaseUnit, offMeshInputPath, threads);
 
     if (!validParam)
     {
@@ -364,7 +385,8 @@ int main(int argc, char** argv)
     }
 
     MapBuilder builder(maxAngle, skipLiquid, skipContinents, skipJunkMaps,
-                       skipBattlegrounds, debugOutput, bigBaseUnit, offMeshInputPath);
+                       skipBattlegrounds, debugOutput, bigBaseUnit, offMeshInputPath,
+                       threads);
 
     if (tileX > -1 && tileY > -1 && mapnum >= 0)
     {
