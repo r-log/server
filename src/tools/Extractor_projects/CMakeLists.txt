@@ -192,7 +192,6 @@ add_executable(mmap-extractor
     Movemap-Generator/MMapCommon.h
     Movemap-Generator/TerrainBuilder.cpp
     Movemap-Generator/TerrainBuilder.h
-    Movemap-Generator/VMapExtensions.cpp
     shared/ExtractorCommon.cpp
     shared/ExtractorCommon.h
     $<$<BOOL:${WIN32}>:Movemap-Generator/Movemap-Generator.rc>

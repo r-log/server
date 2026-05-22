@@ -159,15 +159,15 @@ namespace VMAP
             float iInvScale; /**< TODO */
             WorldModel* iModel; /**< TODO */
 
-#ifdef MMAP_GENERATOR
-    public:
-        /**
-         * @brief Gets the world model.
-         *
-         * @return WorldModel* Pointer to the world model.
-         */
-        WorldModel* const getWorldModel();
-#endif
+        public:
+            /**
+             * @brief Gets the world model.
+             *
+             * Used by the mmap generator to access the underlying geometry.
+             *
+             * @return WorldModel* Pointer to the world model.
+             */
+            WorldModel* const getWorldModel();
     };
 } // namespace VMAP
 

@@ -401,6 +401,13 @@ namespace VMAP
         return result;
     }
 
+    void WmoLiquid::getPosInfo(uint32& tilesX, uint32& tilesY, Vector3& corner) const
+    {
+        tilesX = iTilesX;
+        tilesY = iTilesY;
+        corner = iCorner;
+    }
+
     /**
      * @brief Copy constructor for GroupModel.
      *
@@ -734,6 +741,13 @@ namespace VMAP
         return 0;
     }
 
+    void GroupModel::getMeshData(std::vector<Vector3>& vertices, std::vector<MeshTriangle>& triangles, WmoLiquid*& liquid)
+    {
+        vertices = this->vertices;
+        triangles = this->triangles;
+        liquid = iLiquid;
+    }
+
     /**
      * @brief Passes group models to WorldModel and creates the BIH.
      *
@@ -1011,5 +1025,10 @@ namespace VMAP
 
         fclose(rf);
         return result;
+    }
+
+    void WorldModel::getGroupModels(std::vector<GroupModel>& groupModels)
+    {
+        groupModels = this->groupModels;
     }
 }

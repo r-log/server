@@ -293,4 +293,9 @@ namespace VMAP
         }
         return true;
     }
+
+    WorldModel* const ModelInstance::getWorldModel()
+    {
+        return iModel;
+    }
 }

@@ -305,15 +305,14 @@ namespace VMAP
         typedef bool(*IsVMAPDisabledForFn)(uint32 entry, uint8 flags);
         IsVMAPDisabledForFn IsVMAPDisabledForPtr;
 
-#ifdef MMAP_GENERATOR
-    public:
         /**
          * @brief Gets the instance map tree.
+         *
+         * Used by the mmap generator to walk the loaded vmap trees per map.
          *
          * @param instanceMapTree The instance map tree to populate.
          */
         void getInstanceMapTree(InstanceTreeMap& instanceMapTree);
-#endif
     };
 }
 #endif

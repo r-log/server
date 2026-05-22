@@ -655,5 +655,11 @@ namespace VMAP
         }
         iLoadedTiles.erase(tile);
     }
+
+    void StaticMapTree::getModelInstances(ModelInstance*& models, uint32& count)
+    {
+        models = iTreeValues;
+        count = iNTreeValues;
+    }
 }
 

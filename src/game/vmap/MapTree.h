@@ -230,16 +230,15 @@ namespace VMAP
          */
         uint32 numLoadedTiles() const { return iLoadedTiles.size(); }
 
-#ifdef MMAP_GENERATOR
-    public:
         /**
          * @brief Retrieves model instances.
+         *
+         * Used by the mmap generator to read the loaded model array directly.
          *
          * @param models Pointer to the model instances.
          * @param count The number of model instances.
          */
         void getModelInstances(ModelInstance*& models, uint32& count);
-#endif
     };
 
     /**

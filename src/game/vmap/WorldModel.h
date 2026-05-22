@@ -154,17 +154,17 @@ namespace VMAP
         uint32 iType;    /**< The type of the liquid. */
         float* iHeight;  /**< Height values for the liquid area. (tilesX + 1)*(tilesY + 1) */
         uint8* iFlags;   /**< Flags indicating if a liquid tile is used. */
-#ifdef MMAP_GENERATOR
     public:
         /**
          * @brief Gets the position information of the liquid.
+         *
+         * Used by the mmap generator to walk the liquid tile grid directly.
          *
          * @param tilesX The number of tiles in x direction.
          * @param tilesY The number of tiles in y direction.
          * @param corner The lower corner of the liquid area.
          */
         void getPosInfo(uint32& tilesX, uint32& tilesY, Vector3& corner) const;
-#endif
     };
 
     /**
@@ -286,17 +286,17 @@ namespace VMAP
         BIH meshTree; /**< Bounding Interval Hierarchy tree. */
         WmoLiquid* iLiquid; /**< Pointer to the WmoLiquid. */
 
-#ifdef MMAP_GENERATOR
     public:
         /**
          * @brief Gets the mesh data of the group model.
+         *
+         * Used by the mmap generator to read the raw vertex/triangle arrays.
          *
          * @param vertices Vector to store the vertices.
          * @param triangles Vector to store the triangles.
          * @param liquid Pointer to store the WmoLiquid.
          */
         void getMeshData(std::vector<Vector3>& vertices, std::vector<MeshTriangle>& triangles, WmoLiquid*& liquid);
-#endif
     };
 
     /**
@@ -373,15 +373,15 @@ namespace VMAP
         std::vector<GroupModel> groupModels; /**< Vector of group models. */
         BIH groupTree; /**< Bounding Interval Hierarchy tree. */
 
-#ifdef MMAP_GENERATOR
     public:
         /**
          * @brief Gets the group models of the world model.
          *
+         * Used by the mmap generator to walk the group-model array directly.
+         *
          * @param groupModels Vector to store the group models.
          */
         void getGroupModels(std::vector<GroupModel>& groupModels);
-#endif
     };
 } // namespace VMAP
 
