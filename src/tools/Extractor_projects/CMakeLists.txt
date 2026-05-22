@@ -244,3 +244,36 @@ if(WIN32 AND MSVC)
         OPTIONAL
 )
 endif()
+
+#=======================================================#
+#vmap-harness
+#=======================================================#
+# Regression sampler for vmap/maps/mmaps spatial queries.
+# Reads a CSV of probe points, runs the same VMapManager queries
+# the live server uses, emits a deterministic CSV. STAGE0_PLAN.md.
+add_executable(vmap-harness
+    vmap-harness/main.cpp
+)
+
+target_include_directories(vmap-harness
+    PUBLIC
+        vmap-harness
+)
+
+target_link_libraries(vmap-harness
+    PUBLIC
+        vmap2
+)
+
+install(
+    TARGETS vmap-harness
+    DESTINATION ${BIN_DIR}/${TOOLS_DIR}
+)
+
+if(WIN32 AND MSVC)
+    install(
+        FILES $<TARGET_PDB_FILE:vmap-harness>
+        DESTINATION ${BIN_DIR}/${TOOLS_DIR}
+        OPTIONAL
+    )
+endif()
