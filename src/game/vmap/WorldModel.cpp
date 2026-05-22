@@ -183,7 +183,7 @@ namespace VMAP
      *
      * @param other The WmoLiquid to copy from.
      */
-    WmoLiquid::WmoLiquid(const WmoLiquid& other) : iHeight(NULL), iFlags(NULL)
+    WmoLiquid::WmoLiquid(const WmoLiquid& other) : iHeight(nullptr), iFlags(nullptr)
     {
         *this = other;                                      // use assignment operator defined below
     }
