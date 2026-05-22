@@ -76,6 +76,7 @@
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "TemporarySummon.h"
 #include "VMapFactory.h"
+#include "VMapManager2.h"
 #include "MoveMap.h"
 #include "GameEventMgr.h"
 #include "PoolManager.h"
@@ -1654,6 +1655,30 @@ void World::SetInitialWorldSettings()
     ///- Initialize static helper structures
     AIRegistry::Initialize();
     Player::InitVisibleBits();
+
+    ///- Seed VMapManager2's parent-map cache from Map.dbc's rootPhaseMap
+    ///  column (DBC field 19 = TC's ParentMapID). Must happen before
+    ///  sMapMgr.Initialize() runs any map loads.
+    {
+        std::unordered_map<uint32, std::vector<uint32>> mapData;
+        for (uint32 id = 0; id < sMapStore.GetNumRows(); ++id)
+        {
+            MapEntry const* mapEntry = sMapStore.LookupEntry(id);
+            if (!mapEntry)
+            {
+                continue;
+            }
+            mapData[mapEntry->MapID];   // ensure root entry exists
+            if (mapEntry->rootPhaseMap != -1)
+            {
+                mapData[uint32(mapEntry->rootPhaseMap)].push_back(mapEntry->MapID);
+            }
+        }
+        if (VMAP::IVMapManager* vmgr = VMAP::VMapFactory::createOrGetVMapManager())
+        {
+            static_cast<VMAP::VMapManager2*>(vmgr)->InitializeThreadUnsafe(mapData);
+        }
+    }
 
     ///- Initialize MapManager
     sLog.outString("Starting Map System");

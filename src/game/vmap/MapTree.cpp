@@ -522,6 +522,25 @@ namespace VMAP
 
         std::string tilefile = iBasePath + getTileFileName(iMapID, tileX, tileY);
         FILE* tf = fopen(tilefile.c_str(), "rb");
+        // Parent-map tile fallback. When the child map has no tile file for
+        // these coords, walk up the parent chain and try the parent's tile.
+        // Mirrors TC common/Collision/Maps/MapTree.cpp:246-255. Until WMO
+        // doodad extraction (Stage 4b) actually writes parent-owned content,
+        // this loop is dead code; PR1 stages the read side so the flip in
+        // PR2 is invisible to consumers.
+        if (!tf)
+        {
+            int32 parentMapId = vm->getParentMapId(iMapID);
+            while (parentMapId != -1 && !tf)
+            {
+                std::string parentTileFile = iBasePath + getTileFileName(uint32(parentMapId), tileX, tileY);
+                tf = fopen(parentTileFile.c_str(), "rb");
+                if (!tf)
+                {
+                    parentMapId = vm->getParentMapId(uint32(parentMapId));
+                }
+            }
+        }
         if (tf)
         {
             char chunk[8];

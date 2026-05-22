@@ -116,6 +116,7 @@ namespace VMAP
         // Tree to check collision
         ModelFileMap iLoadedModelFiles; /**< Map of loaded model files. */
         InstanceTreeMap iInstanceMapTrees; /**< Map of instance trees. */
+        std::unordered_map<uint32, uint32> iParentMapData; /**< child mapId -> parent mapId, seeded once at boot by InitializeThreadUnsafe. */
 
         /**
          * @brief Internal method to load a map tile.
@@ -313,6 +314,28 @@ namespace VMAP
          * @param instanceMapTree The instance map tree to populate.
          */
         void getInstanceMapTree(InstanceTreeMap& instanceMapTree);
+
+        /**
+         * @brief Returns the parent map id for a child map, or -1 if none.
+         *
+         * Backed by iParentMapData, seeded once at boot from
+         * Map.dbc.rootPhaseMap. Used by StaticMapTree::LoadMapTile to walk
+         * up the parent chain when a child map's tile file is absent,
+         * matching TC common/Collision/Maps/MapTree.cpp:246-255.
+         *
+         * @param mapId Map id to resolve.
+         * @return Parent map id, or -1 if mapId is a root map or unknown.
+         */
+        int32 getParentMapId(uint32 mapId) const;
+
+        /**
+         * @brief Seed iParentMapData and iInstanceMapTrees from a precomputed
+         * parent-to-children map. Must be called once at boot before any
+         * map loads. Not thread-safe; assumes single-threaded init.
+         *
+         * @param mapData parentMapId -> vector of childMapIds.
+         */
+        void InitializeThreadUnsafe(std::unordered_map<uint32, std::vector<uint32>> const& mapData);
     };
 }
 #endif

@@ -434,4 +434,30 @@ namespace VMAP
     {
         instanceMapTree = iInstanceMapTrees;
     }
+
+    int32 VMapManager2::getParentMapId(uint32 mapId) const
+    {
+        auto itr = iParentMapData.find(mapId);
+        if (itr != iParentMapData.end())
+        {
+            return int32(itr->second);
+        }
+        return -1;
+    }
+
+    void VMapManager2::InitializeThreadUnsafe(std::unordered_map<uint32, std::vector<uint32>> const& mapData)
+    {
+        // Ported from TC common/Collision/Management/VMapManager2.cpp:74-85.
+        // Seed every parent entry in iInstanceMapTrees so subsequent loads
+        // can recognize parent-eligible maps; reverse the data shape into
+        // child -> parent for fast lookup.
+        for (auto const& kv : mapData)
+        {
+            iInstanceMapTrees.insert(InstanceTreeMap::value_type(kv.first, nullptr));
+            for (uint32 childMapId : kv.second)
+            {
+                iParentMapData[childMapId] = kv.first;
+            }
+        }
+    }
 } // namespace VMAP

@@ -45,7 +45,11 @@ namespace VMAP
     {
         MOD_M2 = 1,
         MOD_WORLDSPAWN = 1 << 1,
-        MOD_HAS_BOUND = 1 << 2
+        MOD_HAS_BOUND = 1 << 2,
+        // 1<<3 chosen because mangosthree already uses 1<<1 for MOD_WORLDSPAWN
+        // and 1<<2 for MOD_HAS_BOUND; TC uses 1<<2 here, so the bit layout
+        // diverges by design. See STAGE4_PORT_TARGETS.md §4 (bit-layout).
+        MOD_PARENT_SPAWN = 1 << 3
     };
 
     /**
