@@ -28,6 +28,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <memory>
 
 #include <Recast.h>
 #include <DetourNavMesh.h>
@@ -49,7 +50,7 @@ namespace MMAP
      * @brief
      *
      */
-    typedef map<uint32, set<uint32>*> TileList;
+    typedef map<uint32, unique_ptr<set<uint32>>> TileList;
     /**
      * @brief
      *
@@ -224,7 +225,7 @@ namespace MMAP
              */
             bool shouldSkipTile(uint32 mapID, uint32 tileX, uint32 tileY);
 
-            TerrainBuilder* m_terrainBuilder;
+            unique_ptr<TerrainBuilder> m_terrainBuilder;
             TileList m_tiles;
 
             bool m_debugOutput;

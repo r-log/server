@@ -38,33 +38,22 @@ namespace MMAP
     MapBuilder::MapBuilder(float maxWalkableAngle, bool skipLiquid,
                            bool skipContinents, bool skipJunkMaps, bool skipBattlegrounds,
                            bool debugOutput, bool bigBaseUnit, const char* offMeshFilePath) :
-        m_terrainBuilder(NULL),
+        m_terrainBuilder(make_unique<TerrainBuilder>(skipLiquid)),
         m_debugOutput(debugOutput),
         m_skipContinents(skipContinents),
         m_skipJunkMaps(skipJunkMaps),
         m_skipBattlegrounds(skipBattlegrounds),
         m_maxWalkableAngle(maxWalkableAngle),
         m_bigBaseUnit(bigBaseUnit),
-        m_rcContext(NULL),
+        m_rcContext(new rcContext(false)),
         m_offMeshFilePath(offMeshFilePath)
     {
-        m_terrainBuilder = new TerrainBuilder(skipLiquid);
-
-        m_rcContext = new rcContext(false);
-
         discoverTiles();
     }
 
     /**************************************************************************/
     MapBuilder::~MapBuilder()
     {
-        for (TileList::iterator it = m_tiles.begin(); it != m_tiles.end(); ++it)
-        {
-            (*it).second->clear();
-            delete(*it).second;
-        }
-
-        delete m_terrainBuilder;
         delete m_rcContext;
     }
 
@@ -82,7 +71,7 @@ namespace MMAP
             mapID = uint32(atoi(files[i].substr(0, 3).c_str()));
             if (m_tiles.find(mapID) == m_tiles.end())
             {
-                m_tiles.insert(pair<uint32, set<uint32>*>(mapID, new set<uint32>));
+                m_tiles.insert(make_pair(mapID, make_unique<set<uint32>>()));
                 count++;
             }
         }
@@ -92,7 +81,7 @@ namespace MMAP
         for (uint32 i = 0; i < files.size(); ++i)
         {
             mapID = uint32(atoi(files[i].substr(0, 3).c_str()));
-            m_tiles.insert(pair<uint32, set<uint32>*>(mapID, new set<uint32>));
+            m_tiles.insert(make_pair(mapID, make_unique<set<uint32>>()));
             count++;
         }
         printf(" found %u.\n", count);
@@ -101,7 +90,7 @@ namespace MMAP
         printf(" Discovering tiles... ");
         for (TileList::iterator itr = m_tiles.begin(); itr != m_tiles.end(); ++itr)
         {
-            set<uint32>* tiles = (*itr).second;
+            set<uint32>* tiles = (*itr).second.get();
             mapID = (*itr).first;
 
             sprintf(filter, "%03u*.vmtile", mapID);
@@ -141,12 +130,11 @@ namespace MMAP
         TileList::iterator itr = m_tiles.find(mapID);
         if (itr != m_tiles.end())
         {
-            return (*itr).second;
+            return (*itr).second.get();
         }
 
-        set<uint32>* tiles = new set<uint32>();
-        m_tiles.insert(pair<uint32, set<uint32>*>(mapID, tiles));
-        return tiles;
+        auto inserted = m_tiles.insert(make_pair(mapID, make_unique<set<uint32>>()));
+        return inserted.first->second.get();
     }
 
     /**************************************************************************/
