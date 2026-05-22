@@ -39,11 +39,11 @@ namespace MMAP
      */
     struct IntermediateValues
     {
-        rcHeightfield* heightfield; /**< TODO */
-        rcCompactHeightfield* compactHeightfield; /**< TODO */
-        rcContourSet* contours; /**< TODO */
-        rcPolyMesh* polyMesh; /**< TODO */
-        rcPolyMeshDetail* polyMeshDetail; /**< TODO */
+        rcHeightfield* heightfield;
+        rcCompactHeightfield* compactHeightfield;
+        rcContourSet* contours;
+        rcPolyMesh* polyMesh;
+        rcPolyMeshDetail* polyMeshDetail;
 
         /**
          * @brief

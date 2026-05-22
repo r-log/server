@@ -62,16 +62,16 @@ namespace MMAP
         GRID_V9
     };
 
-    static const int V9_SIZE = 129; /**< TODO */
-    static const int V9_SIZE_SQ = V9_SIZE* V9_SIZE; /**< TODO */
-    static const int V8_SIZE = 128; /**< TODO */
-    static const int V8_SIZE_SQ = V8_SIZE* V8_SIZE; /**< TODO */
-    static const float GRID_SIZE = 533.33333f; /**< TODO */
-    static const float GRID_PART_SIZE = GRID_SIZE / V8_SIZE; /**< TODO */
+    static const int V9_SIZE = 129;
+    static const int V9_SIZE_SQ = V9_SIZE* V9_SIZE;
+    static const int V8_SIZE = 128;
+    static const int V8_SIZE_SQ = V8_SIZE* V8_SIZE;
+    static const float GRID_SIZE = 533.33333f;
+    static const float GRID_PART_SIZE = GRID_SIZE / V8_SIZE;
 
     // see contrib/extractor/system.cpp, CONF_use_minHeight
-    static const float INVALID_MAP_LIQ_HEIGHT = -500.f; /**< TODO */
-    static const float INVALID_MAP_LIQ_HEIGHT_MAX = 5000.0f; /**< TODO */
+    static const float INVALID_MAP_LIQ_HEIGHT = -500.f;
+    static const float INVALID_MAP_LIQ_HEIGHT_MAX = 5000.0f;
 
     // see following files:
     // src/tools/map-extractor/system.cpp
@@ -83,19 +83,19 @@ namespace MMAP
      */
     struct MeshData
     {
-        G3D::Array<float> solidVerts; /**< TODO */
-        G3D::Array<int> solidTris; /**< TODO */
+        G3D::Array<float> solidVerts;
+        G3D::Array<int> solidTris;
 
-        G3D::Array<float> liquidVerts; /**< TODO */
-        G3D::Array<int> liquidTris; /**< TODO */
-        G3D::Array<uint8> liquidType; /**< TODO */
+        G3D::Array<float> liquidVerts;
+        G3D::Array<int> liquidTris;
+        G3D::Array<uint8> liquidType;
 
         // offmesh connection data
-        G3D::Array<float> offMeshConnections;   // [p0y,p0z,p0x,p1y,p1z,p1x] - per connection /**< TODO */
-        G3D::Array<float> offMeshConnectionRads; /**< TODO */
-        G3D::Array<unsigned char> offMeshConnectionDirs; /**< TODO */
-        G3D::Array<unsigned char> offMeshConnectionsAreas; /**< TODO */
-        G3D::Array<unsigned short> offMeshConnectionsFlags; /**< TODO */
+        G3D::Array<float> offMeshConnections;   // [p0y,p0z,p0x,p1y,p1z,p1x] - per connection
+        G3D::Array<float> offMeshConnectionRads;
+        G3D::Array<unsigned char> offMeshConnectionDirs;
+        G3D::Array<unsigned char> offMeshConnectionsAreas;
+        G3D::Array<unsigned short> offMeshConnectionsFlags;
     };
 
     /**

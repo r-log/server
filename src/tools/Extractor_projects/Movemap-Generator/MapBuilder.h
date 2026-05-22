@@ -73,11 +73,11 @@ namespace MMAP
             rcFreePolyMesh(pmesh);
             rcFreePolyMeshDetail(dmesh);
         }
-        rcCompactHeightfield* chf; /**< TODO */
-        rcHeightfield* solid; /**< TODO */
-        rcContourSet* cset; /**< TODO */
-        rcPolyMesh* pmesh; /**< TODO */
-        rcPolyMeshDetail* dmesh; /**< TODO */
+        rcCompactHeightfield* chf;
+        rcHeightfield* solid;
+        rcContourSet* cset;
+        rcPolyMesh* pmesh;
+        rcPolyMeshDetail* dmesh;
     };
 
     /**
@@ -224,18 +224,18 @@ namespace MMAP
              */
             bool shouldSkipTile(uint32 mapID, uint32 tileX, uint32 tileY);
 
-            TerrainBuilder* m_terrainBuilder; /**< TODO */
-            TileList m_tiles; /**< TODO */
+            TerrainBuilder* m_terrainBuilder;
+            TileList m_tiles;
 
-            bool m_debugOutput; /**< TODO */
+            bool m_debugOutput;
 
-            const char* m_offMeshFilePath; /**< TODO */
-            bool m_skipContinents; /**< TODO */
-            bool m_skipJunkMaps; /**< TODO */
-            bool m_skipBattlegrounds; /**< TODO */
+            const char* m_offMeshFilePath;
+            bool m_skipContinents;
+            bool m_skipJunkMaps;
+            bool m_skipBattlegrounds;
 
-            float m_maxWalkableAngle; /**< TODO */
-            bool m_bigBaseUnit; /**< TODO */
+            float m_maxWalkableAngle;
+            bool m_bigBaseUnit;
 
             rcContext* m_rcContext; /**< build performance - not really used for now */
     };

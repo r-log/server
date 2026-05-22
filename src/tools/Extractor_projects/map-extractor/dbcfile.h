@@ -83,7 +83,7 @@ class DBCFile
                  */
                 const std::string& getMessage() {return message;}
             private:
-                std::string message; /**< TODO */
+                std::string message;
         };
         /**
          * @brief
@@ -161,8 +161,8 @@ class DBCFile
                  * @param offset
                  */
                 Record(DBCFile& file, unsigned char* offset): file(file), offset(offset) {}
-                DBCFile& file; /**< TODO */
-                unsigned char* offset; /**< TODO */
+                DBCFile& file;
+                unsigned char* offset;
 
                 friend class DBCFile;
                 friend class DBCFile::Iterator;
@@ -229,7 +229,7 @@ class DBCFile
                     return record.offset != b.record.offset;
                 }
             private:
-                Record record; /**< TODO */
+                Record record;
         };
 
         /**
@@ -270,14 +270,14 @@ class DBCFile
          */
         size_t getMaxId();
     private:
-        std::string filename; /**< TODO */
-        HANDLE fileHandle; /**< TODO */
-        size_t recordSize; /**< TODO */
-        size_t recordCount; /**< TODO */
-        size_t fieldCount; /**< TODO */
-        size_t stringSize; /**< TODO */
-        unsigned char* data; /**< TODO */
-        unsigned char* stringTable; /**< TODO */
+        std::string filename;
+        HANDLE fileHandle;
+        size_t recordSize;
+        size_t recordCount;
+        size_t fieldCount;
+        size_t stringSize;
+        unsigned char* data;
+        unsigned char* stringTable;
 };
 
 #endif

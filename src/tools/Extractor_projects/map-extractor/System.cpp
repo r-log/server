@@ -77,16 +77,16 @@
  */
 typedef struct
 {
-    char name[64];                  /**< TODO */
-    uint32 id;                      /**< TODO */
+    char name[64];
+    uint32 id;
 } map_id;
 
-map_id* map_ids;                    /**< TODO */
-uint16* areas;                      /**< TODO */
-uint16* LiqType;                    /**< TODO */
-char output_path[128] = ".";        /**< TODO */
-char input_path[128] = ".";         /**< TODO */
-uint32 maxAreaId = 0;               /**< TODO */
+map_id* map_ids;
+uint16* areas;
+uint16* LiqType;
+char output_path[128] = ".";
+char input_path[128] = ".";
+uint32 maxAreaId = 0;
 uint32 CONF_max_build = 0;
 /**
  * @brief Data types which can be extracted
@@ -477,17 +477,17 @@ static char const* MAP_LIQUID_MAGIC  = "MLIQ";
  */
 struct map_fileheader
 {
-    uint32 mapMagic;        /**< TODO */
-    uint32 versionMagic;    /**< TODO */
+    uint32 mapMagic;
+    uint32 versionMagic;
     uint32 buildMagic;
-    uint32 areaMapOffset;   /**< TODO */
-    uint32 areaMapSize;     /**< TODO */
-    uint32 heightMapOffset; /**< TODO */
-    uint32 heightMapSize;   /**< TODO */
-    uint32 liquidMapOffset; /**< TODO */
-    uint32 liquidMapSize;   /**< TODO */
-    uint32 holesOffset;     /**< TODO */
-    uint32 holesSize;       /**< TODO */
+    uint32 areaMapOffset;
+    uint32 areaMapSize;
+    uint32 heightMapOffset;
+    uint32 heightMapSize;
+    uint32 liquidMapOffset;
+    uint32 liquidMapSize;
+    uint32 holesOffset;
+    uint32 holesSize;
 };
 
 #define MAP_AREA_NO_AREA      0x0001
@@ -498,9 +498,9 @@ struct map_fileheader
  */
 struct map_areaHeader
 {
-    uint32 fourcc;          /**< TODO */
-    uint16 flags;           /**< TODO */
-    uint16 gridArea;        /**< TODO */
+    uint32 fourcc;
+    uint16 flags;
+    uint16 gridArea;
 };
 
 #define MAP_HEIGHT_NO_HEIGHT  0x0001
@@ -513,10 +513,10 @@ struct map_areaHeader
  */
 struct map_heightHeader
 {
-    uint32 fourcc;          /**< TODO */
-    uint32 flags;           /**< TODO */
-    float  gridHeight;      /**< TODO */
-    float  gridMaxHeight;   /**< TODO */
+    uint32 fourcc;
+    uint32 flags;
+    float  gridHeight;
+    float  gridMaxHeight;
 };
 
 #define MAP_LIQUID_TYPE_NO_WATER    0x00
@@ -538,14 +538,14 @@ struct map_heightHeader
  */
 struct map_liquidHeader
 {
-    uint32 fourcc;          /**< TODO */
-    uint16 flags;           /**< TODO */
-    uint16 liquidType;      /**< TODO */
-    uint8  offsetX;         /**< TODO */
-    uint8  offsetY;         /**< TODO */
-    uint8  width;           /**< TODO */
-    uint8  height;          /**< TODO */
-    float  liquidLevel;     /**< TODO */
+    uint32 fourcc;
+    uint16 flags;
+    uint16 liquidType;
+    uint8  offsetX;
+    uint8  offsetY;
+    uint8  width;
+    uint8  height;
+    float  liquidLevel;
 };
 
 /**
@@ -572,17 +572,17 @@ float selectUInt16StepStore(float maxDiff)
 
 uint16 area_flags[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];      /**< Temporary grid data store */
 
-float V8[ADT_GRID_SIZE][ADT_GRID_SIZE];                         /**< TODO */
-float V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];                 /**< TODO */
-uint16 uint16_V8[ADT_GRID_SIZE][ADT_GRID_SIZE];                 /**< TODO */
-uint16 uint16_V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];         /**< TODO */
-uint8  uint8_V8[ADT_GRID_SIZE][ADT_GRID_SIZE];                  /**< TODO */
-uint8  uint8_V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];          /**< TODO */
+float V8[ADT_GRID_SIZE][ADT_GRID_SIZE];
+float V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];
+uint16 uint16_V8[ADT_GRID_SIZE][ADT_GRID_SIZE];
+uint16 uint16_V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];
+uint8  uint8_V8[ADT_GRID_SIZE][ADT_GRID_SIZE];
+uint8  uint8_V9[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];
 
-uint16 liquid_entry[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];    /**< TODO */
-uint8 liquid_flags[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];     /**< TODO */
-bool  liquid_show[ADT_GRID_SIZE][ADT_GRID_SIZE];                /**< TODO */
-float liquid_height[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];      /**< TODO */
+uint16 liquid_entry[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];
+uint8 liquid_flags[ADT_CELLS_PER_GRID][ADT_CELLS_PER_GRID];
+bool  liquid_show[ADT_GRID_SIZE][ADT_GRID_SIZE];
+float liquid_height[ADT_GRID_SIZE + 1][ADT_GRID_SIZE + 1];
 
 /**
  * @brief

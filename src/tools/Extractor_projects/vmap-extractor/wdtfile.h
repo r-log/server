@@ -60,8 +60,8 @@ class WDTFile
          */
         bool init(char* map_id, unsigned int mapID);
 
-        std::string* gWmoInstansName; /**< TODO */
-        int gnWMO, nMaps; /**< TODO */
+        std::string* gWmoInstansName;
+        int gnWMO, nMaps;
 
         /**
          * @brief
@@ -73,9 +73,9 @@ class WDTFile
         ADTFile* GetMap(int x, int z);
 
     private:
-        MPQFile WDT; /**< TODO */
-        bool maps[64][64]; /**< TODO */
-        std::string filename; /**< TODO */
+        MPQFile WDT;
+        bool maps[64][64];
+        std::string filename;
 };
 
 #endif

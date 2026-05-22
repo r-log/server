@@ -46,7 +46,7 @@ class Model
         uint32 offsBB_vertices, offsBB_indices;
         Vec3D* BB_vertices, *vertices;
         uint16* BB_indices, *indices;
-        size_t nIndices; /**< TODO */
+        size_t nIndices;
 
         /**
          * @brief
@@ -63,7 +63,7 @@ class Model
          */
         bool ConvertToVMAPModel(const char* outfilename);
 
-        bool ok; /**< TODO */
+        bool ok;
 
         /**
          * @brief
@@ -89,7 +89,7 @@ class Model
             vertices = NULL;
             indices = NULL;
         }
-        std::string filename; /**< TODO */
+        std::string filename;
         char outfilename;
 };
 
@@ -100,10 +100,10 @@ class Model
 class ModelInstance
 {
     public:
-        Model* model; /**< TODO */
+        Model* model;
 
-        uint32 id; /**< TODO */
-        Vec3D pos, rot; /**< TODO */
+        uint32 id;
+        Vec3D pos, rot;
         unsigned int d1, Scale;
         float w, sc;
 

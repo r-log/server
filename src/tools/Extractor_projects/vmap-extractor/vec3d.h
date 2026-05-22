@@ -35,7 +35,7 @@
 class Vec3D
 {
     public:
-        float x, y, z; /**< TODO */
+        float x, y, z;
 
         /**
          * @brief

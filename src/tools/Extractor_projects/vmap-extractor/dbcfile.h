@@ -77,7 +77,7 @@ public:
          */
         const std::string& getMessage() { return message; }
     private:
-        std::string message; /**< TODO */
+        std::string message;
     };
     /**
      * @brief
@@ -156,8 +156,8 @@ public:
          * @param offset
          */
         Record(DBCFile& file, unsigned char* offset) : file(file), offset(offset) {}
-        DBCFile& file; /**< TODO */
-        unsigned char* offset; /**< TODO */
+        DBCFile& file;
+        unsigned char* offset;
 
         friend class DBCFile;
         friend class DBCFile::Iterator;
@@ -223,7 +223,7 @@ public:
             return record.offset != b.record.offset;
         }
     private:
-        Record record; /**< TODO */
+        Record record;
     };
 
     /**
