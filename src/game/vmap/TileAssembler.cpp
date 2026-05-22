@@ -74,7 +74,7 @@ namespace VMAP
      * @param len The length of the string to compare.
      * @return bool True if the read data matches the string, false otherwise.
      */
-    bool readChunk(FILE* rf, char* dest, const char* compare, uint32 len)
+    bool readChunk(FILE* rf, char* dest, const char* compare, std::uint32_t len)
     {
         if (fread(dest, sizeof(char), len, rf) != len)
         {

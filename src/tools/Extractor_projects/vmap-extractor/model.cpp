@@ -93,7 +93,7 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
         return false;
     }
 
-    fwrite(szRawVMAPMagic, 8, 1, output);
+    fwrite(VMAP::RAW_VMAP_MAGIC, 8, 1, output);
     uint32 nVertices = 0;
     nVertices = header.nBoundingVertices;
     fwrite(&nVertices, sizeof(int), 1, output);

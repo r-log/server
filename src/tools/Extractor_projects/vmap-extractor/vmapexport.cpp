@@ -109,7 +109,6 @@ uint32 CONF_max_build = 0;
 
 //static const char * szWorkDirMaps = ".\\Maps";
 const char* szWorkDirWmo = "./Buildings";
-const char* szRawVMAPMagic = "VMAPc06";
 
 // Local testing functions
 
@@ -838,12 +837,12 @@ int main(int argc, char** argv)
     printf("\n");
     if (!bExtractedWMOfiles)
     {
-        printf("ERROR: Extract for %s. Work NOT complete.\n   Precise vector data=%d.\nPress any key.\n", szRawVMAPMagic, preciseVectorData);
+        printf("ERROR: Extract for %s. Work NOT complete.\n   Precise vector data=%d.\nPress any key.\n", VMAP::RAW_VMAP_MAGIC, preciseVectorData);
         getchar();
         return 1;
     }
 
-    printf("Extract for %s. Work complete. ", szRawVMAPMagic);
+    printf("Extract for %s. Work complete. ", VMAP::RAW_VMAP_MAGIC);
     if (!bCreatedVmapsFolder || !bExtractedWMOfiles)
     {
         printf("There were errors.\n");

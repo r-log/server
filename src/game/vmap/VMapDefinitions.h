@@ -25,6 +25,8 @@
 #ifndef MANGOS_H_VMAPDEFINITIONS
 #define MANGOS_H_VMAPDEFINITIONS
 
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 #define LIQUID_TILE_SIZE (533.333f / 128.f) ///< Liquid tile size
@@ -44,7 +46,7 @@ namespace VMAP
      * @param len
      * @return bool
      */
-    bool readChunk(FILE* rf, char* dest, const char* compare, uint32 len);
+    bool readChunk(FILE* rf, char* dest, const char* compare, std::uint32_t len);
 }
 
 #ifndef NO_CORE_FUNCS

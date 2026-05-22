@@ -13,7 +13,8 @@ interpretable in TC-vocabulary terms.
 | File | Purpose |
 |---|---|
 | `samples_curated.csv` | ~50 hand-picked waypoints (capital fountains, bridges, dungeon portals, WMO interiors, Z-fall hotspots, liquid edges). Stable `sample_id` per row. |
-| `baseline_curated_<sha>.csv` | Captured harness output tagged with the upstream commit SHA. The reference all future runs diff against. |
+| `baseline_curated_VMAP_4_1.csv` | **Current baseline** — captured against `VMAP_4.1` / `VMAPc07` vmaps (Stage 3 magic bump). Run diffs against this. |
+| `baseline_curated_e5d1eeae1.csv` | Historical baseline — captured pre-Stage-3 against `VMAP_4.0` / `VMAPc06` vmaps at upstream/master commit `e5d1eeae1`. Kept for archaeology. |
 | `diff_runner.py` | Aligns baseline vs candidate by `sample_id`, classifies each delta. Exit 0 = no meaningful change. |
 
 ## Running
@@ -31,7 +32,7 @@ build/src/tools/Extractor_projects/Release/vmap-harness.exe \
 
 # 3. Diff against baseline.
 python server/harness/diff_runner.py \
-    --baseline  server/harness/baseline_curated_<sha>.csv \
+    --baseline  server/harness/baseline_curated_VMAP_4_1.csv \
     --candidate /tmp/run.csv
 ```
 
@@ -65,7 +66,7 @@ doodads). Stable `-200000` values are valid baseline data.
 
 - [x] Builds clean with warnings-as-errors
 - [x] Runs on `server_install/` without crashing
-- [x] Produces `baseline_curated_<sha>.csv`
+- [x] Produces `baseline_curated_VMAP_4_1.csv` (and historical `baseline_curated_e5d1eeae1.csv` for the pre-bump format)
 - [x] Re-run produces zero diff (determinism)
 - [ ] Corrupt one byte of a `.vmtile` → diff appears (interactive demo, deferred)
 - [x] `diff_runner.py` classifies regressions

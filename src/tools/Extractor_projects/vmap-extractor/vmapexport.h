@@ -25,6 +25,8 @@
 #ifndef VMAPEXPORT_H
 #define VMAPEXPORT_H
 
+#include "VMapDefinitions.h"
+
 #include <string>
 #include <set>
 
@@ -46,7 +48,6 @@ enum ModelFlags
 };
 
 extern const char* szWorkDirWmo;
-extern const char* szRawVMAPMagic;                          // vmap magic string for extracted raw vmap data
 
 /**
  * @brief Test if the specified file exists in the building directory
