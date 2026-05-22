@@ -186,7 +186,6 @@ add_executable(mmap-extractor
     Movemap-Generator/generator.cpp
     Movemap-Generator/IntermediateValues.cpp
     Movemap-Generator/IntermediateValues.h
-    Movemap-Generator/MangosMap.h
     Movemap-Generator/MapBuilder.cpp
     Movemap-Generator/MapBuilder.h
     Movemap-Generator/MMapCommon.h
