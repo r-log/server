@@ -39,10 +39,11 @@
 
 #ifndef WIN32
 #include <unistd.h>
- /* This isn't the nicest way to do things..
- * TODO: Fix this with snprintf instead and check that it still works
- */
-#define sprintf_s sprintf
+// sprintf_s is an MSVC extension; provide a size-safe equivalent on POSIX
+// builds by routing through snprintf. The signature matches MSVC's so that
+// any port from mangostwo (which still has sprintf_s call sites) links
+// cleanly on Linux/macOS.
+#define sprintf_s(buf, size, fmt, ...) snprintf((buf), (size), (fmt), ##__VA_ARGS__)
 #endif
 
 #if defined( __GNUC__ )
