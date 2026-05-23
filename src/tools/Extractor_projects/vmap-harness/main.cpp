@@ -211,6 +211,28 @@ int main(int argc, char* argv[])
     // dummy so it returns false (= "vmap not disabled, run the query").
     VMAP::VMapManager2 vmgrImpl;
     vmgrImpl.IsVMAPDisabledForPtr = &IsVMAPDisabledDummy;
+
+    // PR3 child->parent map relationships from Map.dbc field 19
+    // (rootPhaseMap). Hard-coded here so the harness doesn't need its own
+    // DBC reader — Cata 4.3.4 has exactly these 13 child entries (verified
+    // via dbc_parent_maps.py). Without this, StaticMapTree::OpenMapTileFile
+    // can't walk up the parent chain and probes on phased zones return
+    // empty.
+    std::unordered_map<uint32, std::vector<uint32>> mapData;
+    static const std::pair<uint32, uint32> kParentLinks[] = {
+        {638, 654}, {655, 654}, {656, 654},      // Gilneas variants
+        {659, 648}, {661, 648},                  // Mount Hyjal time-walking
+        {719, 1},   {731, 1},   {746, 1},        // Cata phased rooted on Kalimdor
+        {759, 1},   {764, 1},
+        {736, 0},   {751, 0},   {760, 0},        // Cata phased rooted on EK
+    };
+    for (auto const& link : kParentLinks)
+    {
+        mapData[link.second].push_back(link.first);
+        mapData[link.first];  // ensure child key exists in iInstanceMapTrees
+    }
+    vmgrImpl.InitializeThreadUnsafe(mapData);
+
     VMAP::IVMapManager* vmgr = &vmgrImpl;
 
     std::string line;

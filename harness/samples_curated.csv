@@ -49,3 +49,18 @@ ek-uldum-akhenet,0,-9560.00,-1485.00,15.00,,,,Uldum near pyramid (Cata zone, EK 
 ek-vashjir-shimmering,0,-7036.00,4934.00,-200.00,,,,Vashj'ir Shimmering Expanse (Cata underwater)
 ek-tol-barad-keep,0,-650.00,-3690.00,53.00,,,,Tol Barad keep (Cata PvP zone)
 kal-uldum-temple,1,-9116.00,-1554.00,77.00,,,,Uldum Lost City of Tol'vir exterior
+phased-gil-cathedral-parent,654,-1820.00,1370.00,30.00,,,,Gilneas Cathedral area on parent (rootPhaseMap of 638/655/656)
+phased-gil-cathedral-638,638,-1820.00,1370.00,30.00,,,,Same Gilneas coord on map 638 (parent fallback test, child phase 1)
+phased-gil-cathedral-655,655,-1820.00,1370.00,30.00,,,,Same Gilneas coord on map 655 (parent fallback test, child phase 2)
+phased-gil-cathedral-656,656,-1820.00,1370.00,30.00,,,,Same Gilneas coord on map 656 (parent fallback test, child phase 3)
+phased-hyjal-nordrassil-parent,648,4500.00,-3950.00,950.00,,,,Mount Hyjal Nordrassil area on parent (rootPhaseMap of 659/661)
+phased-hyjal-nordrassil-659,659,4500.00,-3950.00,950.00,,,,Same Hyjal coord on map 659 (time-walking phase, parent fallback test)
+phased-hyjal-nordrassil-661,661,4500.00,-3950.00,950.00,,,,Same Hyjal coord on map 661 (time-walking phase 2, parent fallback test)
+phased-cata-kal-719,719,-1290.00,137.00,130.00,,,,Cata phased zone child of Kalimdor (719) at Thunder Bluff area; parent fallback test
+phased-cata-kal-731,731,-1290.00,137.00,130.00,,,,Cata phased zone child of Kalimdor (731) at Thunder Bluff area
+phased-cata-kal-746,746,-1290.00,137.00,130.00,,,,Cata phased zone child of Kalimdor (746) at Thunder Bluff area
+phased-cata-kal-759,759,-1290.00,137.00,130.00,,,,Cata phased zone child of Kalimdor (759) at Thunder Bluff area
+phased-cata-kal-764,764,-1290.00,137.00,130.00,,,,Cata phased zone child of Kalimdor (764) at Thunder Bluff area
+phased-cata-ek-736,736,-8829.66,629.49,93.95,,,,Cata phased zone child of EK (736) at SW fountain; parent fallback test
+phased-cata-ek-751,751,-8829.66,629.49,93.95,,,,Cata phased zone child of EK (751) at SW fountain
+phased-cata-ek-760,760,-8829.66,629.49,93.95,,,,Cata phased zone child of EK (760) at SW fountain

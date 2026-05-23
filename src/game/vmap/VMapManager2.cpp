@@ -447,13 +447,17 @@ namespace VMAP
 
     void VMapManager2::InitializeThreadUnsafe(std::unordered_map<uint32, std::vector<uint32>> const& mapData)
     {
-        // Ported from TC common/Collision/Management/VMapManager2.cpp:74-85.
-        // Seed every parent entry in iInstanceMapTrees so subsequent loads
-        // can recognize parent-eligible maps; reverse the data shape into
-        // child -> parent for fast lookup.
+        // Populate child -> parent for fast lookup by getParentMapId.
+        //
+        // TC also pre-inserts nullptr StaticMapTree* placeholders into
+        // iInstanceMapTrees here so its _loadMap can recognise "parent
+        // map known but not yet materialised." mangosthree's _loadMap
+        // (this file, around line 152-163) derefs instanceTree->second
+        // unconditionally; inserting nullptr would crash on the first
+        // load of any parent map. Skip the placeholder; we only need
+        // the iParentMapData mapping for the parent-fallback to fire.
         for (auto const& kv : mapData)
         {
-            iInstanceMapTrees.insert(InstanceTreeMap::value_type(kv.first, nullptr));
             for (uint32 childMapId : kv.second)
             {
                 iParentMapData[childMapId] = kv.first;
