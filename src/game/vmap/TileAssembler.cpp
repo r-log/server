@@ -104,12 +104,17 @@ namespace VMAP
      * @param pSrcDirName The source directory name.
      * @param pDestDirName The destination directory name.
      */
-    TileAssembler::TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName)
+    TileAssembler::TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName, unsigned int threads)
     {
         iCurrentUniqueNameId = 0;
         iFilterMethod = NULL;
         iSrcDir = pSrcDirName;
         iDestDir = pDestDirName;
+        m_threads = threads ? threads : std::thread::hardware_concurrency();
+        if (m_threads == 0)
+        {
+            m_threads = 1;  // hardware_concurrency() may return 0 on some platforms
+        }
         // mkdir(iDestDir);
         // init();
     }
@@ -130,139 +135,31 @@ namespace VMAP
             return false;
         }
 
-        // Export map data
-        for (MapData::iterator map_iter = mapData.begin(); map_iter != mapData.end() && success; ++map_iter)
+        // Populate the work queue, one entry per map.
+        for (auto const& kv : mapData)
         {
-            // Build global map tree
-            std::vector<ModelSpawn*> mapSpawns;
-            UniqueEntryMap::iterator entry;
+            m_mapQueue.push(kv.first);
+        }
+        std::cout << "Processing " << m_mapQueue.size()
+                  << " maps with " << m_threads << " worker thread(s)" << std::endl;
 
-            std::cout << "Calculating model bounds for map " << map_iter->first << std::endl;
-            for (entry = map_iter->second->UniqueEntries.begin(); entry != map_iter->second->UniqueEntries.end(); ++entry)
-            {
-                // M2 models don't have a bound set in WDT/ADT placement data, I still think they're not used for LoS at all on retail
-                if (entry->second.flags & MOD_M2)
-                {
-                    if (!calculateTransformedBound(entry->second))
-                    {
-                        break;
-                    }
-                }
-                else if (entry->second.flags & MOD_WORLDSPAWN) // WMO maps and terrain maps use different origin, so we need to adapt :/
-                {
-                    // TODO: remove extractor hack and uncomment below line:
-                    // entry->second.iPos += Vector3(533.33333f*32, 533.33333f*32, 0.f);
-                    entry->second.iBound = entry->second.iBound + Vector3(533.33333f * 32, 533.33333f * 32, 0.f);
-                }
-                mapSpawns.push_back(&(entry->second));
-                spawnedModelFiles.insert(entry->second.name);
-            }
+        // Spawn the worker pool. processMap() touches only its own map's
+        // data + (mutexed) shared cache + spawnedModelFiles, so cross-map
+        // parallelism is safe.
+        std::vector<std::thread> workers;
+        workers.reserve(m_threads);
+        for (unsigned int i = 0; i < m_threads; ++i)
+        {
+            workers.emplace_back(&TileAssembler::workerLoop, this);
+        }
+        for (std::thread& w : workers)
+        {
+            w.join();
+        }
 
-            std::cout << "Creating map tree..." << std::endl;
-            BIH pTree;
-            pTree.build(mapSpawns, BoundsTrait<ModelSpawn*>::getBounds);
-
-            // ===> possibly move this code to StaticMapTree class
-            std::map<uint32, uint32> modelNodeIdx;
-            for (uint32 i = 0; i < mapSpawns.size(); ++i)
-            {
-                modelNodeIdx.insert(pair<uint32, uint32>(mapSpawns[i]->ID, i));
-            }
-
-            // Write map tree file
-            std::stringstream mapfilename;
-            mapfilename << iDestDir << "/" << std::setfill('0') << std::setw(3) << map_iter->first << ".vmtree";
-            FILE* mapfile = fopen(mapfilename.str().c_str(), "wb");
-            if (!mapfile)
-            {
-                success = false;
-                std::cout << "Can not open " << mapfilename.str();
-                break;
-            }
-
-            // General info
-            if (success && fwrite(VMAP_MAGIC, 1, 8, mapfile) != 8)
-            {
-                success = false;
-            }
-            uint32 globalTileID = StaticMapTree::packTileID(65, 65);
-            pair<TileMap::iterator, TileMap::iterator> globalRange = map_iter->second->TileEntries.equal_range(globalTileID);
-            char isTiled = globalRange.first == globalRange.second; // Only maps without terrain (tiles) have global WMO
-            if (success && fwrite(&isTiled, sizeof(char), 1, mapfile) != 1)
-            {
-                success = false;
-            }
-            // Nodes
-            if (success && fwrite("NODE", 4, 1, mapfile) != 1)
-            {
-                success = false;
-            }
-            if (success)
-            {
-                success = pTree.WriteToFile(mapfile);
-            }
-            // Global map spawns (WDT), if any (most instances)
-            if (success && fwrite("GOBJ", 4, 1, mapfile) != 1)
-            {
-                success = false;
-            }
-
-            for (TileMap::iterator glob = globalRange.first; glob != globalRange.second && success; ++glob)
-            {
-                success = ModelSpawn::WriteToFile(mapfile, map_iter->second->UniqueEntries[glob->second]);
-            }
-
-            fclose(mapfile);
-
-            // <====
-
-            // Write map tile files, similar to ADT files, only with extra BSP tree node info
-            TileMap& tileEntries = map_iter->second->TileEntries;
-            TileMap::iterator tile;
-            for (tile = tileEntries.begin(); tile != tileEntries.end(); ++tile)
-            {
-                const ModelSpawn& spawn = map_iter->second->UniqueEntries[tile->second];
-                if (spawn.flags & MOD_WORLDSPAWN)           // WDT spawn, saved as tile 65/65 currently...
-                {
-                    continue;
-                }
-                uint32 nSpawns = tileEntries.count(tile->first);
-                std::stringstream tilefilename;
-                tilefilename.fill('0');
-                tilefilename << iDestDir << "/" << std::setw(3) << map_iter->first << "_";
-                uint32 x, y;
-                StaticMapTree::unpackTileID(tile->first, x, y);
-                tilefilename << std::setw(2) << x << "_" << std::setw(2) << y << ".vmtile";
-                FILE* tilefile = fopen(tilefilename.str().c_str(), "wb");
-                // File header
-                if (success && fwrite(VMAP_MAGIC, 1, 8, tilefile) != 8)
-                {
-                    success = false;
-                }
-                // Write number of tile spawns
-                if (success && fwrite(&nSpawns, sizeof(uint32), 1, tilefile) != 1)
-                {
-                    success = false;
-                }
-                // Write tile spawns
-                for (uint32 s = 0; s < nSpawns; ++s)
-                {
-                    if (s && tile != tileEntries.end())
-                    {
-                        ++tile;
-                    }
-                    const ModelSpawn& spawn2 = map_iter->second->UniqueEntries[tile->second];
-                    success = success && ModelSpawn::WriteToFile(tilefile, spawn2);
-                    // MapTree nodes to update when loading tile:
-                    std::map<uint32, uint32>::iterator nIdx = modelNodeIdx.find(spawn2.ID);
-                    if (success && fwrite(&nIdx->second, sizeof(uint32), 1, tilefile) != 1)
-                    {
-                        success = false;
-                    }
-                }
-                fclose(tilefile);
-            }
-            // break; // test, extract only first map; TODO: remove this line
+        if (m_anyError.load())
+        {
+            success = false;
         }
 
         // add an object models, listed in temp_gameobject_models file
@@ -357,6 +254,217 @@ namespace VMAP
         return success;
     }
 
+    void TileAssembler::workerLoop()
+    {
+        while (true)
+        {
+            uint32 mapID;
+            MapSpawns* spawns;
+            {
+                std::lock_guard<std::mutex> lock(m_queueMutex);
+                if (m_mapQueue.empty())
+                {
+                    return;
+                }
+                mapID = m_mapQueue.front();
+                m_mapQueue.pop();
+                spawns = mapData[mapID];
+            }
+            if (!processMap(mapID, spawns))
+            {
+                m_anyError.store(true);
+                // Do not stop — other maps may still succeed; mirrors
+                // the original convertWorld2 short-circuit at most for
+                // the failing map's tile loop.
+            }
+        }
+    }
+
+    bool TileAssembler::processMap(uint32 mapID, MapSpawns* mapSpawns)
+    {
+        bool success = true;
+        std::vector<ModelSpawn*> spawnList;
+        UniqueEntryMap::iterator entry;
+
+        // Per-phase timing so we can attribute a stall to a specific
+        // phase instead of guessing. Logged at the end of processMap.
+        using Clk = std::chrono::steady_clock;
+        auto fmtMs = [](Clk::duration d) {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
+        };
+        auto t0 = Clk::now();
+
+        std::cout << "Calculating model bounds for map " << mapID << std::endl;
+        for (entry = mapSpawns->UniqueEntries.begin(); entry != mapSpawns->UniqueEntries.end(); ++entry)
+        {
+            // M2 models don't have a bound set in WDT/ADT placement data
+            if (entry->second.flags & MOD_M2)
+            {
+                if (!calculateTransformedBound(entry->second))
+                {
+                    // One bad model must not orphan the rest of the map.
+                    // TC pattern at tc-preservation/src/common/Collision/
+                    // Maps/TileAssembler.cpp:87-88.
+                    continue;
+                }
+            }
+            else if (entry->second.flags & MOD_WORLDSPAWN) // WMO maps and terrain maps use different origin
+            {
+                entry->second.iBound = entry->second.iBound + Vector3(533.33333f * 32, 533.33333f * 32, 0.f);
+            }
+            spawnList.push_back(&(entry->second));
+            {
+                std::lock_guard<std::mutex> lock(m_spawnedFilesMutex);
+                spawnedModelFiles.insert(entry->second.name);
+            }
+        }
+
+        auto t1 = Clk::now();   // <-- end of bound-calc phase
+
+        std::cout << "Creating map tree for map " << mapID << "..." << std::endl;
+        BIH pTree;
+        pTree.build(spawnList, BoundsTrait<ModelSpawn*>::getBounds);
+
+        std::map<uint32, uint32> modelNodeIdx;
+        for (uint32 i = 0; i < spawnList.size(); ++i)
+        {
+            modelNodeIdx.insert(std::pair<uint32, uint32>(spawnList[i]->ID, i));
+        }
+
+        auto t2 = Clk::now();   // <-- end of BIH build phase
+
+        // Write map tree file
+        std::stringstream mapfilename;
+        mapfilename << iDestDir << "/" << std::setfill('0') << std::setw(3) << mapID << ".vmtree";
+        FILE* mapfile = fopen(mapfilename.str().c_str(), "wb");
+        if (!mapfile)
+        {
+            std::cout << "Can not open " << mapfilename.str() << std::endl;
+            return false;
+        }
+
+        if (success && fwrite(VMAP_MAGIC, 1, 8, mapfile) != 8)
+        {
+            success = false;
+        }
+        uint32 globalTileID = StaticMapTree::packTileID(65, 65);
+        std::pair<TileMap::iterator, TileMap::iterator> globalRange = mapSpawns->TileEntries.equal_range(globalTileID);
+        char isTiled = globalRange.first == globalRange.second; // Only maps without terrain (tiles) have global WMO
+        if (success && fwrite(&isTiled, sizeof(char), 1, mapfile) != 1)
+        {
+            success = false;
+        }
+        if (success && fwrite("NODE", 4, 1, mapfile) != 1)
+        {
+            success = false;
+        }
+        if (success)
+        {
+            success = pTree.WriteToFile(mapfile);
+        }
+        if (success && fwrite("GOBJ", 4, 1, mapfile) != 1)
+        {
+            success = false;
+        }
+        for (TileMap::iterator glob = globalRange.first; glob != globalRange.second && success; ++glob)
+        {
+            success = ModelSpawn::WriteToFile(mapfile, mapSpawns->UniqueEntries[glob->second]);
+        }
+        fclose(mapfile);
+
+        auto t3 = Clk::now();   // <-- end of vmtree write phase
+
+        // Write per-tile vmtile files.
+        //
+        // Walks unique tileIDs via equal_range instead of the old hand-
+        // rolled inner ++tile dance. The original loop assumed the
+        // iterator landing on a MOD_WORLDSPAWN spawn meant "skip this
+        // tile entirely," but if a tile holds a WORLDSPAWN AND other
+        // spawns (which happens at tile (65,65) for instances once
+        // Stage 4b's WMO interior doodads are extracted), the inner
+        // ++tile walked past end() and the outer loop condition became
+        // undefined behaviour — observed as 8 worker threads silently
+        // wedging at exactly the post-230 batch of instance maps.
+        TileMap& tileEntries = mapSpawns->TileEntries;
+        TileMap::iterator tile = tileEntries.begin();
+        while (tile != tileEntries.end())
+        {
+            uint32 tileID = tile->first;
+            std::pair<TileMap::iterator, TileMap::iterator> range = tileEntries.equal_range(tileID);
+            // Advance the outer iterator past this tile up front so we
+            // can't be tripped by the inner advance.
+            tile = range.second;
+
+            // Filter out MOD_WORLDSPAWN spawns; they live in the .vmtree
+            // global-spawn block, not in .vmtile files.
+            std::vector<uint32> spawnIDs;
+            spawnIDs.reserve(8);
+            for (TileMap::iterator it = range.first; it != range.second; ++it)
+            {
+                const ModelSpawn& s = mapSpawns->UniqueEntries[it->second];
+                if (s.flags & MOD_WORLDSPAWN)
+                {
+                    continue;
+                }
+                spawnIDs.push_back(it->second);
+            }
+            if (spawnIDs.empty())
+            {
+                continue;
+            }
+
+            std::stringstream tilefilename;
+            tilefilename.fill('0');
+            tilefilename << iDestDir << "/" << std::setw(3) << mapID << "_";
+            uint32 x, y;
+            StaticMapTree::unpackTileID(tileID, x, y);
+            tilefilename << std::setw(2) << x << "_" << std::setw(2) << y << ".vmtile";
+            FILE* tilefile = fopen(tilefilename.str().c_str(), "wb");
+            if (!tilefile)
+            {
+                success = false;
+                continue;
+            }
+            uint32 nSpawns = static_cast<uint32>(spawnIDs.size());
+            if (success && fwrite(VMAP_MAGIC, 1, 8, tilefile) != 8)
+            {
+                success = false;
+            }
+            if (success && fwrite(&nSpawns, sizeof(uint32), 1, tilefile) != 1)
+            {
+                success = false;
+            }
+            for (uint32 spawnID : spawnIDs)
+            {
+                const ModelSpawn& spawn2 = mapSpawns->UniqueEntries[spawnID];
+                success = success && ModelSpawn::WriteToFile(tilefile, spawn2);
+                std::map<uint32, uint32>::iterator nIdx = modelNodeIdx.find(spawn2.ID);
+                if (success && fwrite(&nIdx->second, sizeof(uint32), 1, tilefile) != 1)
+                {
+                    success = false;
+                }
+            }
+            fclose(tilefile);
+        }
+        auto t4 = Clk::now();   // <-- end of vmtile-write phase
+
+        // Single-line summary so worker threads don't interleave parts.
+        char timing[256];
+        std::snprintf(timing, sizeof(timing),
+            "TIMING map=%u spawns=%zu tiles=%zu bound=%lldms BIH=%lldms vmtree=%lldms vmtiles=%lldms total=%lldms\n",
+            mapID,
+            mapSpawns->UniqueEntries.size(),
+            mapSpawns->TileEntries.size(),
+            (long long)fmtMs(t1 - t0),
+            (long long)fmtMs(t2 - t1),
+            (long long)fmtMs(t3 - t2),
+            (long long)fmtMs(t4 - t3),
+            (long long)fmtMs(t4 - t0));
+        std::fputs(timing, stderr);
+        std::fflush(stderr);
+        return success;
+    }
+
     bool TileAssembler::calculateTransformedBound(ModelSpawn& spawn)
     {
         // Construct full path to the model file
@@ -368,12 +476,69 @@ namespace VMAP
         modelPosition.iScale = spawn.iScale;
         modelPosition.init();
 
-        // Load the raw model data from disk
-        WorldModel_Raw raw_model;
-        if (!raw_model.Read(modelFilename.c_str()))
+        // Per-process bound cache. Each unique model is parsed once,
+        // then reused for every spawn that references it. With Stage 4b
+        // WMO interior doodad spawns this turns 700K disk reads (most
+        // re-reads of the same lamp/banner/pillar models) into ~11K
+        // unique reads. nullptr sentinel = "this filename failed to
+        // read, don't try again".
+        // Shared across worker threads via m_modelCacheMutex. Once a
+        // WorldModel_Raw lands in the cache it is read-only, so worker
+        // threads can dereference the pointer outside the lock.
+        static std::unordered_map<std::string, std::unique_ptr<WorldModel_Raw>> s_modelCache;
+        WorldModel_Raw* cachedRaw = nullptr;
+
+        // Fast path — shared (reader) lock. Once a model is cached we want
+        // every worker to be able to look it up in parallel without
+        // serializing on a global mutex. ~99% of bound-calc calls after
+        // warm-up are cache HITS, so this lock is contended cheaply.
         {
-            return false;
+            std::shared_lock<std::shared_mutex> lock(m_modelCacheMutex);
+            auto it = s_modelCache.find(modelFilename);
+            if (it != s_modelCache.end())
+            {
+                if (!it->second)
+                {
+                    return false;   // previously-failed read; sentinel cached
+                }
+                cachedRaw = it->second.get();
+            }
         }
+
+        // Slow path — cache miss. Do the disk Read OUTSIDE any lock so
+        // other workers can keep reading the cache; then take the
+        // exclusive lock and re-check (another worker may have populated
+        // the same key in the meantime).
+        if (!cachedRaw)
+        {
+            auto fresh = std::make_unique<WorldModel_Raw>();
+            bool readOk = fresh->Read(modelFilename.c_str());
+
+            std::unique_lock<std::shared_mutex> lock(m_modelCacheMutex);
+            auto it = s_modelCache.find(modelFilename);
+            if (it != s_modelCache.end())
+            {
+                if (!it->second)
+                {
+                    return false;
+                }
+                cachedRaw = it->second.get();
+            }
+            else if (!readOk)
+            {
+                s_modelCache.emplace(modelFilename, nullptr);
+                return false;
+            }
+            else
+            {
+                cachedRaw = fresh.get();
+                s_modelCache.emplace(modelFilename, std::move(fresh));
+            }
+        }
+        WorldModel_Raw& raw_model = *cachedRaw;
+        // From here on we read raw_model.groupsArray without holding the
+        // cache mutex — safe because the WorldModel_Raw is never mutated
+        // after Read() returns.
 
         // If the model has multiple groups, it might indicate it's not an M2
         uint32 groups = raw_model.groupsArray.size();

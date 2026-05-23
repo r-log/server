@@ -27,8 +27,15 @@
 
 #include <G3D/Vector3.h>
 #include <G3D/Matrix3.h>
+#include <atomic>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <queue>
 #include <set>
+#include <shared_mutex>
+#include <thread>
+#include <unordered_map>
 
 #include "ModelInstance.h"
 #include "WorldModel.h"
@@ -170,14 +177,42 @@ namespace VMAP
         MapData mapData; /**< Map data */
         std::set<std::string> spawnedModelFiles; /**< Set of spawned model files */
 
+        // Parallel convertWorld2 plumbing. The per-map work is fully
+        // independent so we run it on a small worker pool. Cross-worker
+        // sharing surfaces are guarded by the mutexes below.
+        unsigned int m_threads;                            ///< worker count, 1 == legacy serial path
+        std::mutex m_queueMutex;                           ///< guards m_mapQueue
+        std::queue<uint32> m_mapQueue;                     ///< map IDs left to process
+        std::mutex m_spawnedFilesMutex;                    ///< guards spawnedModelFiles
+        std::shared_mutex m_modelCacheMutex;               ///< guards s_modelCache; reads use shared_lock so the warm-path doesn't serialize workers
+        std::atomic<bool> m_anyError{ false };             ///< OR-reduced from each worker
+
+        /**
+         * @brief Worker body for parallel convertWorld2: pop map IDs off
+         *        m_mapQueue and run processMap on each until the queue is
+         *        drained.
+         */
+        void workerLoop();
+
+        /**
+         * @brief Per-map slice of convertWorld2 (bound calc + BIH build +
+         *        .vmtree + .vmtile writes). Independent across maps; safe
+         *        to run concurrently with other processMap invocations.
+         *
+         * @return bool True on success.
+         */
+        bool processMap(uint32 mapID, MapSpawns* spawns);
+
     public:
         /**
          * @brief Constructor to initialize the TileAssembler
          *
          * @param pSrcDirName The source directory name
          * @param pDestDirName The destination directory name
+         * @param threads     Worker count for parallel convertWorld2.
+         *                    0 == hardware_concurrency, 1 == serial.
          */
-        TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName);
+        TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName, unsigned int threads = 0);
         /**
          * @brief Destructor to clean up resources
          */

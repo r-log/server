@@ -23,27 +23,51 @@
  */
 
 #include "TileAssembler.h"
-#include <string>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <string>
 
 
 //=======================================================
 int main(int argc, char* argv[])
 {
-    if (argc != 3)
+    // Usage: vmap-assembler <raw data dir> <vmap dest dir> [--threads N]
+    // --threads 0 (or omitted) = std::thread::hardware_concurrency()
+    // --threads 1 = serial path (legacy behaviour)
+    unsigned int threads = 0;
+    std::string posArgs[2];
+    int posCount = 0;
+    for (int i = 1; i < argc; ++i)
     {
-        std::cout << "usage: " << argv[0] << " <raw data dir> <vmap dest dir>" << std::endl;
+        if (!std::strcmp(argv[i], "--threads") && i + 1 < argc)
+        {
+            int n = std::atoi(argv[++i]);
+            if (n >= 0)
+            {
+                threads = static_cast<unsigned int>(n);
+            }
+        }
+        else if (posCount < 2)
+        {
+            posArgs[posCount++] = argv[i];
+        }
+    }
+    if (posCount != 2)
+    {
+        std::cout << "usage: " << argv[0]
+                  << " <raw data dir> <vmap dest dir> [--threads N]" << std::endl;
         return 1;
     }
 
-    std::string src = argv[1];
-    std::string dest = argv[2];
+    std::string src = posArgs[0];
+    std::string dest = posArgs[1];
 
     std::cout << "using " << src << " as source directory and writing output to " << dest << std::endl;
 
     std::cout << "Create TileAssembler " << std::endl;
 
-    VMAP::TileAssembler* ta = new VMAP::TileAssembler(src, dest);
+    VMAP::TileAssembler* ta = new VMAP::TileAssembler(src, dest, threads);
 
     std::cout << "Convert to World2 " << std::endl;
 
