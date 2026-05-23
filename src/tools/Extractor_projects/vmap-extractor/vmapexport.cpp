@@ -109,6 +109,7 @@ uint32 CONF_max_build = 0;
 
 //static const char * szWorkDirMaps = ".\\Maps";
 const char* szWorkDirWmo = "./Buildings";
+std::unordered_map<std::string, WMODoodadData> WmoDoodads;
 
 // Local testing functions
 
@@ -574,6 +575,22 @@ bool ExtractSingleWmo(std::string& fname)
         printf("Couldn't open RootWmo!!!\n");
         return true;
     }
+    // Stash the WMO's interior-doodad table so ADT/WDT placements can
+    // spawn them later via Doodad::ExtractSet. Normalize the cache key
+    // exactly the way adtfile.cpp builds WmoInstansName (fixnamen +
+    // fixname2 on the plain name), or the lookup at placement time will
+    // miss every entry.
+    // Keep a reference into the cache so the per-group MODR aggregation
+    // below can fill in WMODoodadData::References as each group is read.
+    WMODoodadData* cachedDoodads = nullptr;
+    {
+        std::string plainKey = plain_name;
+        fixnamen(&plainKey[0], plainKey.size());
+        fixname2(&plainKey[0], plainKey.size());
+        auto inserted = WmoDoodads.emplace(std::move(plainKey), WMODoodadData{});
+        cachedDoodads = &inserted.first->second;
+        std::swap(*cachedDoodads, froot.DoodadData);
+    }
     FILE* output = fopen(szLocalFile, "wb");
     if (!output)
     {
@@ -604,6 +621,28 @@ bool ExtractSingleWmo(std::string& fname)
             }
 
             Wmo_nVertices += fgroup.ConvertToVMAPGroupWmo(output, &froot, preciseVectorData);
+
+            // Aggregate this group's MODR references into the cached
+            // WMODoodadData. Mirrors TC tools/vmap4_extractor/
+            // vmapexport.cpp:338-348. Without this, ExtractSet has no
+            // "actually used" set and falls back to extracting every
+            // doodad in the selected set (the 10x bound-calc bloat).
+            if (cachedDoodads)
+            {
+                for (uint16 groupReference : fgroup.DoodadReferences)
+                {
+                    if (groupReference >= cachedDoodads->Spawns.size())
+                    {
+                        continue;
+                    }
+                    uint32 doodadNameIndex = cachedDoodads->Spawns[groupReference].NameIndex;
+                    if (froot.ValidDoodadNames.find(doodadNameIndex) == froot.ValidDoodadNames.end())
+                    {
+                        continue;
+                    }
+                    cachedDoodads->References.insert(groupReference);
+                }
+            }
         }
     }
 

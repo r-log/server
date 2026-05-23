@@ -30,8 +30,57 @@
 
 #include <string>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "vec3d.h"
 #include "mpqfile.h"
+
+namespace WMO
+{
+    /// MODS chunk entry. Each WMO has one or more doodad SETS; each set
+    /// names a contiguous range of MODD entries that belong together.
+    struct MODS
+    {
+        char Name[20];
+        uint32 StartIndex;  ///< first MODD index for this set
+        uint32 Count;       ///< number of MODD entries
+        char _pad[4];
+    };
+
+    /// MODD chunk entry. One spawn record per doodad placement inside the WMO.
+    /// NameIndex is a byte offset into the WMO's MODN string blob.
+    struct MODD
+    {
+        uint32 NameIndex : 24;
+        uint32 _flags    : 8;
+        float  Position[3];
+        float  RotationX;
+        float  RotationY;
+        float  RotationZ;
+        float  RotationW;
+        float  Scale;
+        uint32 Color;
+    };
+}
+
+/// Doodad data extracted from a single WMO root. Cached globally
+/// (see WmoDoodads below) so ADT/WDT placements can spawn the interior
+/// doodads when the WMO is placed in the world.
+struct WMODoodadData
+{
+    std::vector<WMO::MODS>      Sets;        ///< from MODS
+    std::vector<char>           Paths;       ///< raw MODN string blob; index via MODD::NameIndex
+    std::vector<WMO::MODD>      Spawns;      ///< from MODD
+    std::unordered_set<uint16>  References;  ///< doodad indices actually referenced by any WMO group (MODR-derived, ValidDoodadNames-filtered). Iterated by Doodad::ExtractSet.
+};
+
+/// Per-WMO doodad cache keyed by WMO plain filename (e.g.
+/// "Stormwind_Cathedral.wmo"). Populated once per WMO during
+/// ExtractSingleWmo; consumed by Doodad::ExtractSet when an ADT/WDT
+/// places the WMO into the world. The cache lives for the lifetime of
+/// the extractor process — memory cost is bounded by the WMO set size.
+extern std::unordered_map<std::string, WMODoodadData> WmoDoodads;
 
 // MOPY flags
 #define WMO_MATERIAL_NOCAMCOLLIDE    0x01
@@ -60,6 +109,8 @@ class WMORoot
         unsigned int col;
         float bbcorn1[3];
         float bbcorn2[3];
+        WMODoodadData DoodadData;  ///< parsed MODS/MODN/MODD; consumed by Doodad::ExtractSet
+        std::unordered_set<uint32> ValidDoodadNames;  ///< MODN offsets whose .m2 extracted OK; mirrors TC tools/vmap4_extractor/wmo.h:91
 
         /**
          * @brief
@@ -146,6 +197,7 @@ class WMOGroup
         WMOLiquidVert* LiquEx;
         char* LiquBytes;
         uint32 liquflags;
+        std::vector<uint16> DoodadReferences;  ///< MODR per-group doodad indices; mirrors TC tools/vmap4_extractor/wmo.h DoodadReferences
 
         /**
          * @brief

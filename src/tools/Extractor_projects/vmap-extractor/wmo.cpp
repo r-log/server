@@ -26,6 +26,7 @@
 
 #include "vmapexport.h"
 #include "wmo.h"
+#include "adtfile.h"  // fixnamen / GetPlainName helpers
 #include "vec3d.h"
 #include <cstdio>
 #include <cstdlib>
@@ -81,7 +82,71 @@ bool WMORoot::open()
             f.read(bbcorn1, 12);
             f.read(bbcorn2, 12);
             f.read(&liquidType, 4);
-            break;
+        }
+        else if (!strcmp(fourcc, "MODS"))
+        {
+            // Doodad sets. One entry per set; each set names a contiguous
+            // range of MODD spawn records.
+            DoodadData.Sets.resize(size / sizeof(WMO::MODS));
+            if (size)
+            {
+                f.read(DoodadData.Sets.data(), size);
+            }
+        }
+        else if (!strcmp(fourcc, "MODN"))
+        {
+            // Packed null-terminated doodad model paths. MODD entries index
+            // into this blob via NameIndex.
+            DoodadData.Paths.resize(size);
+            if (size)
+            {
+                f.read(DoodadData.Paths.data(), size);
+            }
+            // Extract each referenced doodad .m2 so its bound is available
+            // to TileAssembler::calculateTransformedBound at assemble time.
+            // adtfile.cpp:162 (MMDX loop) applies fixnamen BEFORE
+            // ExtractSingleModel so the lowercase-extension branch fires
+            // and the file lands on disk as Foo.m2 instead of FOO.MDX. Do
+            // the same here. Normalize in-place inside DoodadData.Paths so
+            // Doodad::ExtractSet's later lookups via NameIndex see the
+            // same case-folded form.
+            char* ptr = DoodadData.Paths.data();
+            char* end = ptr + size;
+            while (ptr < end && *ptr == 0)
+            {
+                ++ptr;  // skip leading padding nulls
+            }
+            char* base = DoodadData.Paths.data();
+            while (ptr < end)
+            {
+                std::size_t pathLen = std::strlen(ptr);
+                if (pathLen)
+                {
+                    fixnamen(ptr, pathLen);
+                    std::string path(ptr, pathLen);
+                    std::string fixedName;
+                    StringSet failedPaths;
+                    // Record the MODN-offset into ValidDoodadNames only if
+                    // ExtractSingleModel produced an on-disk file. Mirrors
+                    // TC tools/vmap4_extractor/wmo.cpp:104-105 — used by
+                    // ExtractSingleWmo to filter group references so
+                    // doodads with missing models never make it into
+                    // WMODoodadData.References.
+                    if (ExtractSingleModel(path, fixedName, failedPaths))
+                    {
+                        ValidDoodadNames.insert(static_cast<uint32>(ptr - base));
+                    }
+                }
+                ptr += pathLen + 1;
+            }
+        }
+        else if (!strcmp(fourcc, "MODD"))
+        {
+            DoodadData.Spawns.resize(size / sizeof(WMO::MODD));
+            if (size)
+            {
+                f.read(DoodadData.Spawns.data(), size);
+            }
         }
         /*
         else if (!strcmp(fourcc,"MOTX"))
@@ -97,15 +162,6 @@ bool WMORoot::open()
         {
         }
         else if (!strcmp(fourcc,"MOLT"))
-        {
-        }
-        else if (!strcmp(fourcc,"MODN"))
-        {
-        }
-        else if (!strcmp(fourcc,"MODS"))
-        {
-        }
-        else if (!strcmp(fourcc,"MODD"))
         {
         }
         else if (!strcmp(fourcc,"MOSB"))
@@ -221,6 +277,20 @@ bool WMOGroup::open()
             MOBA = new uint16[size / 2];
             moba_size = size / 2;
             f.read(MOBA, size);
+        }
+        else if (!strcmp(fourcc, "MODR"))
+        {
+            // Per-group doodad references — index list into the WMO root's
+            // MODD spawn array. Mirrors TC tools/vmap4_extractor/wmo.cpp:
+            // 247-251. Without this filter the assembler bound-calc loop
+            // chews through 10x more spawn records than necessary because
+            // it can't distinguish "actually used by a group" from "in the
+            // doodad catalog".
+            DoodadReferences.resize(size / sizeof(uint16));
+            if (size)
+            {
+                f.read(DoodadReferences.data(), size);
+            }
         }
         else if (!strcmp(fourcc, "MLIQ"))
         {
@@ -525,6 +595,10 @@ WMOInstance::WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint
     f.read(ff, 12);
     pos3 = Vec3D(ff[0], ff[1], ff[2]);
     f.read(&d2, 4);
+    // MODF byte layout at offset 52: Flags (u16) then DoodadSet (u16).
+    // d2 packs them; pull DoodadSet out so Doodad::ExtractSet can pick
+    // the right MODS entry when spawning interior doodads.
+    doodadset = int((d2 >> 16) & 0xFFFF);
 
     uint16 trash, adtId;
     f.read(&adtId, 2);

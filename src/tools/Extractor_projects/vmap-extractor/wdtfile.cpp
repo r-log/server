@@ -116,6 +116,12 @@ bool WDTFile::init(char* map_id, unsigned int mapID)
                     int id;
                     WDT.read(&id, 4);
                     WMOInstance inst(WDT, gWmoInstansName[id].c_str(), mapID, 65, 65, dirfile);
+                    // Stage 4b: spawn the global WMO's interior doodads.
+                    auto dit = WmoDoodads.find(gWmoInstansName[id]);
+                    if (dit != WmoDoodads.end())
+                    {
+                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ true, mapID, 65, 65, dirfile);
+                    }
                 }
                 delete[] gWmoInstansName;
             }

@@ -32,8 +32,29 @@
 
 class WMOInstance;
 class MPQFile;
+struct WMODoodadData;
 
 Vec3D fixCoordSystem(Vec3D v);
+
+namespace Doodad
+{
+    /// Spawn the interior doodads of one placed WMO into the dirfile.
+    /// Each doodad becomes one M2 spawn record (mangosthree dirfile
+    /// format: mapID + tileX + tileY + flags + adtId + id + pos + rot
+    /// + scale + name). No bound is written; TileAssembler computes
+    /// the M2 bounding box at assemble time.
+    ///
+    /// For PR2 (no MOD_PARENT_SPAWN write) the spawn flags are always
+    /// MOD_M2; PR3 will extend the signature to thread originalMapId
+    /// through and gate MOD_PARENT_SPAWN when mapID != originalMapId.
+    void ExtractSet(WMODoodadData const& doodadData,
+                    WMOInstance const& wmo,
+                    bool isGlobalWmo,
+                    uint32 mapID,
+                    uint32 tileX,
+                    uint32 tileY,
+                    FILE* pDirfile);
+}
 
 /**
  * @brief

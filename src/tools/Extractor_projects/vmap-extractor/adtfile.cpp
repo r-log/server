@@ -217,6 +217,14 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failed
                     uint32 id;
                     ADT.read(&id, 4);
                     WMOInstance inst(ADT, WmoInstansName[id].c_str(), map_num, tileX, tileY, dirfile);
+                    // Stage 4b: also spawn the WMO's interior doodads
+                    // (statues, pillars, etc.) so server-side LoS sees
+                    // them. The cache was filled by ExtractSingleWmo.
+                    auto dit = WmoDoodads.find(WmoInstansName[id]);
+                    if (dit != WmoDoodads.end())
+                    {
+                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ false, map_num, tileX, tileY, dirfile);
+                    }
                 }
                 delete[] WmoInstansName;
             }

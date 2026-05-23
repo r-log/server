@@ -26,12 +26,21 @@
 
 #include <cassert>
 #include <algorithm>
+#include <atomic>
+#include <cmath>
 #include <cstdio>
+#include <cstring>
 
 #include "mpqfile.h"
 #include "model.h"
 #include "wmo.h"
 #include "vmapexport.h"
+#include "adtfile.h"   // GetPlainName / fixnamen helpers
+
+#include <G3D/Matrix3.h>
+#include <G3D/Quat.h>
+#include <G3D/Vector3.h>
+#include <G3D/g3dmath.h>
 
 extern HANDLE WorldMpq;
 
@@ -216,4 +225,154 @@ ModelInstance::ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID
         realx1, realy1,
         realx2, realy2
         ); */
+}
+
+namespace
+{
+    // Globally unique spawn id allocator for WMO interior doodads. Avoids
+    // clobbering ADT/WDT-placed M2 IDs (which come from MODF.UniqueId,
+    // typically well below 2^31). Starts at 0xC0000000 so the high two
+    // bits act as a "this is a WMO-doodad spawn" marker.
+    std::atomic<uint32> g_doodadSpawnId{ 0xC0000000u };
+}
+
+namespace Doodad
+{
+    void ExtractSet(WMODoodadData const& doodadData,
+                    WMOInstance const& wmo,
+                    bool /*isGlobalWmo*/,
+                    uint32 mapID,
+                    uint32 tileX,
+                    uint32 tileY,
+                    FILE* pDirfile)
+    {
+        if (doodadData.Sets.empty() || doodadData.Paths.empty() || doodadData.Spawns.empty())
+        {
+            return;
+        }
+
+        // WMO placement origin in world space (mangosthree's WMOInstance
+        // ctor already applied fixCoords and the 0,0 -> 32*tile centering
+        // for global WMOs, so wmo.pos is the world coord to add to).
+        G3D::Vector3 wmoPosition(wmo.pos.x, wmo.pos.y, wmo.pos.z);
+
+        // MODF.Rotation is stored as raw Euler degrees (pitch/yaw/roll)
+        // before fixCoords. The convention mirrors TC's reading at
+        // vmap4_extractor/model.cpp:217: fromEulerAnglesZYX(rotY, rotX, rotZ).
+        G3D::Matrix3 wmoRotation = G3D::Matrix3::fromEulerAnglesZYX(
+            G3D::toRadians(wmo.rot.y),
+            G3D::toRadians(wmo.rot.x),
+            G3D::toRadians(wmo.rot.z));
+
+        // TC's extractSingleSet lambda — iterate the WMODoodadData's
+        // References set (= doodads actually referenced by any WMO group,
+        // filtered for valid model extraction) and keep only those whose
+        // doodad index falls in the requested MODS range.
+        auto extractSingleSet = [&](WMO::MODS const& doodadSetData)
+        {
+            for (uint16 doodadIndex : doodadData.References)
+            {
+                if (doodadIndex < doodadSetData.StartIndex ||
+                    doodadIndex >= doodadSetData.StartIndex + doodadSetData.Count)
+                {
+                    continue;
+                }
+                if (doodadIndex >= doodadData.Spawns.size())
+                {
+                    continue;
+                }
+                WMO::MODD const& doodad = doodadData.Spawns[doodadIndex];
+
+            // Resolve model name from the MODN string blob.
+            if (doodad.NameIndex >= doodadData.Paths.size())
+            {
+                continue;
+            }
+            char const* pathStart = doodadData.Paths.data() + doodad.NameIndex;
+            char ModelInstName[1024];
+            const char* plain = GetPlainName(pathStart);
+            std::snprintf(ModelInstName, sizeof(ModelInstName), "%s", plain);
+            uint32 nlen = static_cast<uint32>(std::strlen(ModelInstName));
+            if (nlen < 4)
+            {
+                continue;
+            }
+
+            // .mdx/.mdl -> .m2 rewrite. WMORoot::open already applied
+            // fixnamen to the Paths blob (mirroring adtfile.cpp:162 for
+            // MMDX entries), so the extension is guaranteed lowercase by
+            // the time we get here and the strcmp matches first try.
+            char* ext = &ModelInstName[nlen - 4];
+            if (!std::strcmp(ext, ".mdx") || !std::strcmp(ext, ".mdl"))
+            {
+                ModelInstName[nlen - 2] = '2';
+                ModelInstName[nlen - 1] = '\0';
+                nlen = static_cast<uint32>(std::strlen(ModelInstName));
+            }
+
+            // Skip if the extracted .m2 isn't on disk (failed earlier or
+            // model is not LoS-relevant per ExtractSingleModel's filter).
+            char tempname[1100];
+            std::snprintf(tempname, sizeof(tempname), "%s/%s", szWorkDirWmo, ModelInstName);
+            FILE* input = std::fopen(tempname, "r+b");
+            if (!input)
+            {
+                continue;
+            }
+            std::fseek(input, 8, SEEK_SET);
+            int nVertices = 0;
+            std::size_t count = std::fread(&nVertices, sizeof(int), 1, input);
+            std::fclose(input);
+            if (count != 1 || nVertices == 0)
+            {
+                continue;
+            }
+
+            // World position = wmo.pos + R(wmo.rot) * doodad.localPos
+            G3D::Vector3 localPos(doodad.Position[0], doodad.Position[1], doodad.Position[2]);
+            G3D::Vector3 worldPos = wmoPosition + (wmoRotation * localPos);
+
+            // World rotation = compose doodad quat with WMO rotation matrix,
+            // then convert back to Euler. Order mirrors TC's model.cpp:268-274.
+            G3D::Quat doodadQuat(doodad.RotationX, doodad.RotationY, doodad.RotationZ, doodad.RotationW);
+            G3D::Matrix3 worldRot = doodadQuat.toRotationMatrix() * wmoRotation;
+            float ex = 0.0f, ey = 0.0f, ez = 0.0f;
+            worldRot.toEulerAnglesXYZ(ez, ex, ey);
+
+            Vec3D rotation;
+            rotation.x = G3D::toDegrees(ex);
+            rotation.y = G3D::toDegrees(ey);
+            rotation.z = G3D::toDegrees(ez);
+
+            uint16 adtId = 0;            // not used for models
+            uint32 flags = MOD_M2;       // PR3 will OR in MOD_PARENT_SPAWN
+            uint32 uniqueId = g_doodadSpawnId.fetch_add(1, std::memory_order_relaxed);
+
+            // Write a spawn record matching ModelInstance's layout
+            // (mapID, tileX, tileY, flags, adtId, id, pos, rot, sc, nlen, name).
+            Vec3D outPos(worldPos.x, worldPos.y, worldPos.z);
+            float scale = doodad.Scale;
+            std::fwrite(&mapID, sizeof(uint32), 1, pDirfile);
+            std::fwrite(&tileX, sizeof(uint32), 1, pDirfile);
+            std::fwrite(&tileY, sizeof(uint32), 1, pDirfile);
+            std::fwrite(&flags, sizeof(uint32), 1, pDirfile);
+            std::fwrite(&adtId, sizeof(uint16), 1, pDirfile);
+            std::fwrite(&uniqueId, sizeof(uint32), 1, pDirfile);
+            std::fwrite(&outPos, sizeof(float), 3, pDirfile);
+            std::fwrite(&rotation, sizeof(float), 3, pDirfile);
+            std::fwrite(&scale, sizeof(float), 1, pDirfile);
+            std::fwrite(&nlen, sizeof(uint32), 1, pDirfile);
+            std::fwrite(ModelInstName, sizeof(char), nlen, pDirfile);
+            }   // end of for (doodadIndex : References)
+        };      // end of extractSingleSet lambda
+
+        // TC model.cpp:320-323: always emit set 0 (default) and, if the
+        // placement asked for a different set, that one too.
+        extractSingleSet(doodadData.Sets[0]);
+        std::size_t setIndex = static_cast<std::size_t>(wmo.doodadset);
+        if (setIndex != 0 && setIndex < doodadData.Sets.size())
+        {
+            extractSingleSet(doodadData.Sets[setIndex]);
+        }
+    }
 }
