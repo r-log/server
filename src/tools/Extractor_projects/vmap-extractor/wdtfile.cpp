@@ -115,12 +115,15 @@ bool WDTFile::init(char* map_id, unsigned int mapID)
                 {
                     int id;
                     WDT.read(&id, 4);
-                    WMOInstance inst(WDT, gWmoInstansName[id].c_str(), mapID, 65, 65, dirfile);
+                    WMOInstance inst(WDT, gWmoInstansName[id].c_str(), mapID, /*originalMapId*/ mapID, 65, 65, dirfile);
                     // Stage 4b: spawn the global WMO's interior doodads.
+                    // Global WMOs always live in their own WDT (no parent
+                    // fallback), so originalMapId == mapID. Mirrors TC
+                    // wdtfile.cpp:111 isGlobalWmo path.
                     auto dit = WmoDoodads.find(gWmoInstansName[id]);
                     if (dit != WmoDoodads.end())
                     {
-                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ true, mapID, 65, 65, dirfile);
+                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ true, mapID, /*originalMapId*/ mapID, 65, 65, dirfile);
                     }
                 }
                 delete[] gWmoInstansName;

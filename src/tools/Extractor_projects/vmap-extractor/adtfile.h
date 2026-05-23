@@ -171,7 +171,7 @@ class ADTFile
          * @param failedPaths
          * @return bool
          */
-        bool init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failedPaths);
+        bool init(uint32 map_num, uint32 originalMapId, uint32 tileX, uint32 tileY, StringSet& failedPaths);
     private:
         MPQFile ADT;
         string AdtFilename;

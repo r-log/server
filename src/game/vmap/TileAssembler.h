@@ -101,7 +101,8 @@ namespace VMAP
     struct MapSpawns
     {
         UniqueEntryMap UniqueEntries; /**< Unique model entries */
-        TileMap TileEntries; /**< Tile entries */
+        TileMap TileEntries;          /**< Spawns whose data originates from THIS map's WDT */
+        TileMap ParentTileEntries;    /**< Spawns inherited from a parent map's WDT (MOD_PARENT_SPAWN). Merged into each tile's .vmtile at write time. Mirrors TC TileAssembler.h:73. */
     };
 
     /**

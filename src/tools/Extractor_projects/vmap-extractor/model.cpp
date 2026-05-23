@@ -242,6 +242,7 @@ namespace Doodad
                     WMOInstance const& wmo,
                     bool /*isGlobalWmo*/,
                     uint32 mapID,
+                    uint32 originalMapId,
                     uint32 tileX,
                     uint32 tileY,
                     FILE* pDirfile)
@@ -345,7 +346,13 @@ namespace Doodad
             rotation.z = G3D::toDegrees(ez);
 
             uint16 adtId = 0;            // not used for models
-            uint32 flags = MOD_M2;       // PR3 will OR in MOD_PARENT_SPAWN
+            uint32 flags = MOD_M2;
+            if (mapID != originalMapId)
+            {
+                // PR3: spawn inherited from a parent WDT's ADT data.
+                // TileAssembler will route this into ParentTileEntries.
+                flags |= MOD_PARENT_SPAWN;
+            }
             uint32 uniqueId = g_doodadSpawnId.fetch_add(1, std::memory_order_relaxed);
 
             // Write a spawn record matching ModelInstance's layout

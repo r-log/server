@@ -95,6 +95,7 @@ typedef struct
 {
     char name[64];
     unsigned int id;
+    int32_t parent_id;   ///< rootPhaseMap from Map.dbc field 19; -1 if root. Used by PR3 to fall back to parent's WDT when child has no own data, and to flag spawns with MOD_PARENT_SPAWN.
 } map_id;
 
 map_id* map_ids;
@@ -462,34 +463,79 @@ void Usage(char* prg)
 void ParsMapFiles()
 {
     char fn[512];
-    //char id_filename[64];
     char id[10];
     StringSet failedPaths;
     printf("\n");
+
+    // Lookup mapID -> map_ids index, so we can resolve a parent_id back
+    // to its map_id entry when opening parent WDTs.
+    std::map<uint32, uint32> mapIndexById;
+    for (unsigned int i = 0; i < map_count; ++i)
+    {
+        mapIndexById[map_ids[i].id] = i;
+    }
+
     for (unsigned int i = 0; i < map_count; ++i)
     {
         sprintf(id, "%03u", map_ids[i].id);
         sprintf(fn, "World\\Maps\\%s\\%s.wdt", map_ids[i].name, map_ids[i].name);
         WDTFile WDT(fn, map_ids[i].name);
-        if (WDT.init(id, map_ids[i].id))
+        if (!WDT.init(id, map_ids[i].id))
         {
-            printf(" Processing Map %u (%s)\n[", map_ids[i].id, map_ids[i].name);
-            for (int x = 0; x < 64; ++x)
+            continue;
+        }
+
+        // PR3: open the parent WDT too if this map has rootPhaseMap >= 0
+        // (Map.dbc field 19). For tiles where the child WDT has no ADT
+        // we fall back to the parent WDT and tag spawns from that data
+        // with originalMapId = parent so they get MOD_PARENT_SPAWN.
+        // Mirrors TC vmap4_extractor/vmapexport.cpp:388-407.
+        WDTFile* parentWDT = nullptr;
+        char parentId[10] = {0};
+        if (map_ids[i].parent_id >= 0)
+        {
+            auto pit = mapIndexById.find(uint32(map_ids[i].parent_id));
+            if (pit != mapIndexById.end())
             {
-                for (int y = 0; y < 64; ++y)
+                uint32 pIdx = pit->second;
+                sprintf(parentId, "%03u", map_ids[pIdx].id);
+                char parentFn[512];
+                sprintf(parentFn, "World\\Maps\\%s\\%s.wdt", map_ids[pIdx].name, map_ids[pIdx].name);
+                parentWDT = new WDTFile(parentFn, map_ids[pIdx].name);
+                if (!parentWDT->init(parentId, map_ids[pIdx].id))
                 {
-                    if (ADTFile* ADT = WDT.GetMap(x, y))
+                    delete parentWDT;
+                    parentWDT = nullptr;
+                }
+            }
+        }
+
+        printf(" Processing Map %u (%s)%s\n[", map_ids[i].id, map_ids[i].name,
+               parentWDT ? " [with parent fallback]" : "");
+        for (int x = 0; x < 64; ++x)
+        {
+            for (int y = 0; y < 64; ++y)
+            {
+                bool ownData = false;
+                if (ADTFile* ADT = WDT.GetMap(x, y))
+                {
+                    ownData = ADT->init(map_ids[i].id, /*originalMapId*/ map_ids[i].id, x, y, failedPaths);
+                    delete ADT;
+                }
+                if (!ownData && parentWDT)
+                {
+                    if (ADTFile* ADT = parentWDT->GetMap(x, y))
                     {
-                        //sprintf(id_filename,"%02u %02u %03u",x,y,map_ids[i].id);//!!!!!!!!!
-                        ADT->init(map_ids[i].id, x, y, failedPaths);
+                        ADT->init(map_ids[i].id, /*originalMapId*/ uint32(map_ids[i].parent_id), x, y, failedPaths);
                         delete ADT;
                     }
                 }
-                printf("#");
-                fflush(stdout);
             }
-            printf("]\n");
+            printf("#");
+            fflush(stdout);
         }
+        printf("]\n");
+        delete parentWDT;
     }
 
     if (!failedPaths.empty())
@@ -858,7 +904,11 @@ int main(int argc, char** argv)
         {
             map_ids[x].id = dbc->getRecord(x).getUInt(0);
             strcpy(map_ids[x].name, dbc->getRecord(x).getString(1));
-            printf(" Map %d - %s\n", map_ids[x].id, map_ids[x].name);
+            // Map.dbc field 19 = rootPhaseMap (TC's ParentMapID). -1 = no parent.
+            // Used to thread originalMapId through extraction so spawns
+            // inherited from a parent map's WDT get MOD_PARENT_SPAWN.
+            map_ids[x].parent_id = dbc->getRecord(x).getInt(19);
+            printf(" Map %d - %s (parent=%d)\n", map_ids[x].id, map_ids[x].name, map_ids[x].parent_id);
         }
 
 

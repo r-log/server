@@ -244,8 +244,15 @@ namespace VMAP
 
             // Store the model spawn in the UniqueEntries container
             current->UniqueEntries.insert(pair<uint32, ModelSpawn>(spawn.ID, spawn));
-            // Associate the tile ID (constructed from tileX, tileY) with the spawn ID
-            current->TileEntries.insert(pair<uint32, uint32>(StaticMapTree::packTileID(tileX, tileY), spawn.ID));
+            // PR3: split native vs inherited spawns. Spawns extracted
+            // from a parent WDT carry MOD_PARENT_SPAWN; they go into
+            // ParentTileEntries so the .vmtile write phase can layer
+            // them after the tile's own content. Mirrors TC
+            // TileAssembler.cpp:93.
+            TileMap& tileDest = (spawn.flags & MOD_PARENT_SPAWN)
+                ? current->ParentTileEntries
+                : current->TileEntries;
+            tileDest.insert(pair<uint32, uint32>(StaticMapTree::packTileID(tileX, tileY), spawn.ID));
         }
 
         // Check for any file read errors
@@ -376,39 +383,53 @@ namespace VMAP
 
         // Write per-tile vmtile files.
         //
-        // Walks unique tileIDs via equal_range instead of the old hand-
-        // rolled inner ++tile dance. The original loop assumed the
-        // iterator landing on a MOD_WORLDSPAWN spawn meant "skip this
-        // tile entirely," but if a tile holds a WORLDSPAWN AND other
-        // spawns (which happens at tile (65,65) for instances once
-        // Stage 4b's WMO interior doodads are extracted), the inner
-        // ++tile walked past end() and the outer loop condition became
-        // undefined behaviour — observed as 8 worker threads silently
-        // wedging at exactly the post-230 batch of instance maps.
-        TileMap& tileEntries = mapSpawns->TileEntries;
-        TileMap::iterator tile = tileEntries.begin();
-        while (tile != tileEntries.end())
+        // PR3 extension: each .vmtile holds OWN spawns followed by
+        // PARENT spawns inherited from a parent WDT's data. Build the
+        // union of tile IDs from TileEntries + ParentTileEntries (a
+        // parent-only tile still needs a .vmtile file), then for each
+        // unique tileID collect both ranges, filter MOD_WORLDSPAWN out,
+        // and write own-then-parent like TC TileAssembler.cpp:155-168.
+        //
+        // The old hand-rolled inner ++tile dance is replaced by
+        // equal_range — pre-PR3 it could walk past end() (UB) when a
+        // tile held a MOD_WORLDSPAWN plus other spawns.
+        std::set<uint32> tileIDs;
+        for (TileMap::const_iterator it = mapSpawns->TileEntries.begin(); it != mapSpawns->TileEntries.end(); ++it)
         {
-            uint32 tileID = tile->first;
-            std::pair<TileMap::iterator, TileMap::iterator> range = tileEntries.equal_range(tileID);
-            // Advance the outer iterator past this tile up front so we
-            // can't be tripped by the inner advance.
-            tile = range.second;
+            tileIDs.insert(it->first);
+        }
+        for (TileMap::const_iterator it = mapSpawns->ParentTileEntries.begin(); it != mapSpawns->ParentTileEntries.end(); ++it)
+        {
+            tileIDs.insert(it->first);
+        }
 
-            // Filter out MOD_WORLDSPAWN spawns; they live in the .vmtree
-            // global-spawn block, not in .vmtile files.
-            std::vector<uint32> spawnIDs;
-            spawnIDs.reserve(8);
-            for (TileMap::iterator it = range.first; it != range.second; ++it)
+        for (uint32 tileID : tileIDs)
+        {
+            std::pair<TileMap::iterator, TileMap::iterator> ownRange = mapSpawns->TileEntries.equal_range(tileID);
+            std::pair<TileMap::iterator, TileMap::iterator> parentRange = mapSpawns->ParentTileEntries.equal_range(tileID);
+
+            std::vector<uint32> ownSpawnIDs;
+            std::vector<uint32> parentSpawnIDs;
+            ownSpawnIDs.reserve(8);
+            for (TileMap::iterator it = ownRange.first; it != ownRange.second; ++it)
+            {
+                const ModelSpawn& s = mapSpawns->UniqueEntries[it->second];
+                if (s.flags & MOD_WORLDSPAWN)
+                {
+                    continue;   // global WMOs live in the .vmtree GOBJ block
+                }
+                ownSpawnIDs.push_back(it->second);
+            }
+            for (TileMap::iterator it = parentRange.first; it != parentRange.second; ++it)
             {
                 const ModelSpawn& s = mapSpawns->UniqueEntries[it->second];
                 if (s.flags & MOD_WORLDSPAWN)
                 {
                     continue;
                 }
-                spawnIDs.push_back(it->second);
+                parentSpawnIDs.push_back(it->second);
             }
-            if (spawnIDs.empty())
+            if (ownSpawnIDs.empty() && parentSpawnIDs.empty())
             {
                 continue;
             }
@@ -425,7 +446,7 @@ namespace VMAP
                 success = false;
                 continue;
             }
-            uint32 nSpawns = static_cast<uint32>(spawnIDs.size());
+            uint32 nSpawns = static_cast<uint32>(ownSpawnIDs.size() + parentSpawnIDs.size());
             if (success && fwrite(VMAP_MAGIC, 1, 8, tilefile) != 8)
             {
                 success = false;
@@ -434,8 +455,7 @@ namespace VMAP
             {
                 success = false;
             }
-            for (uint32 spawnID : spawnIDs)
-            {
+            auto writeOne = [&](uint32 spawnID) {
                 const ModelSpawn& spawn2 = mapSpawns->UniqueEntries[spawnID];
                 success = success && ModelSpawn::WriteToFile(tilefile, spawn2);
                 std::map<uint32, uint32>::iterator nIdx = modelNodeIdx.find(spawn2.ID);
@@ -443,7 +463,9 @@ namespace VMAP
                 {
                     success = false;
                 }
-            }
+            };
+            for (uint32 spawnID : ownSpawnIDs)    { writeOne(spawnID); }
+            for (uint32 spawnID : parentSpawnIDs) { writeOne(spawnID); }
             fclose(tilefile);
         }
         auto t4 = Clk::now();   // <-- end of vmtile-write phase

@@ -101,7 +101,7 @@ ADTFile::ADTFile(char* filename): ADT(WorldMpq, filename)
     AdtFilename.append(filename);
 }
 
-bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failedPaths)
+bool ADTFile::init(uint32 map_num, uint32 originalMapId, uint32 tileX, uint32 tileY, StringSet& failedPaths)
 {
     if (ADT.isEof())
     {
@@ -216,14 +216,15 @@ bool ADTFile::init(uint32 map_num, uint32 tileX, uint32 tileY, StringSet& failed
                 {
                     uint32 id;
                     ADT.read(&id, 4);
-                    WMOInstance inst(ADT, WmoInstansName[id].c_str(), map_num, tileX, tileY, dirfile);
+                    WMOInstance inst(ADT, WmoInstansName[id].c_str(), map_num, originalMapId, tileX, tileY, dirfile);
                     // Stage 4b: also spawn the WMO's interior doodads
                     // (statues, pillars, etc.) so server-side LoS sees
-                    // them. The cache was filled by ExtractSingleWmo.
+                    // them. PR3: pass originalMapId so doodads inherited
+                    // from a parent WDT get MOD_PARENT_SPAWN tagged.
                     auto dit = WmoDoodads.find(WmoInstansName[id]);
                     if (dit != WmoDoodads.end())
                     {
-                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ false, map_num, tileX, tileY, dirfile);
+                        Doodad::ExtractSet(dit->second, inst, /*isGlobalWmo*/ false, map_num, originalMapId, tileX, tileY, dirfile);
                     }
                 }
                 delete[] WmoInstansName;

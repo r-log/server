@@ -259,7 +259,7 @@ class WMOInstance
          * @param tileY
          * @param pDirfile
          */
-        WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint32 tileX, uint32 tileY, FILE* pDirfile);
+        WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint32 originalMapId, uint32 tileX, uint32 tileY, FILE* pDirfile);
 
         /**
          * @brief

@@ -146,6 +146,34 @@ namespace VMAP
      * @param tileY The tile Y coordinate.
      * @return std::string The generated tile file name.
      */
+    StaticMapTree::TileFileOpenResult StaticMapTree::OpenMapTileFile(std::string const& basePath, uint32 mapID, uint32 tileX, uint32 tileY, VMapManager2* vm)
+    {
+        // Try the requested mapID first. If absent, walk up the parent
+        // chain (rootPhaseMap in Map.dbc, exposed via VMapManager2::
+        // getParentMapId) and try each ancestor's tile file. Mirrors TC
+        // common/Collision/Maps/MapTree.cpp:238-260.
+        TileFileOpenResult result;
+        result.UsedMapId = mapID;
+        std::string name = basePath + getTileFileName(mapID, tileX, tileY);
+        result.File = fopen(name.c_str(), "rb");
+        if (!result.File && vm)
+        {
+            int32 parentMapId = vm->getParentMapId(mapID);
+            while (parentMapId != -1)
+            {
+                std::string parentName = basePath + getTileFileName(uint32(parentMapId), tileX, tileY);
+                result.File = fopen(parentName.c_str(), "rb");
+                if (result.File)
+                {
+                    result.UsedMapId = uint32(parentMapId);
+                    break;
+                }
+                parentMapId = vm->getParentMapId(uint32(parentMapId));
+            }
+        }
+        return result;
+    }
+
     std::string StaticMapTree::getTileFileName(uint32 mapID, uint32 tileX, uint32 tileY)
     {
         std::stringstream tilefilename;
@@ -356,7 +384,7 @@ namespace VMAP
      * @param tileY The tile Y coordinate.
      * @return true if the map can be loaded, false otherwise.
      */
-    bool StaticMapTree::CanLoadMap(const std::string& vmapPath, uint32 mapID, uint32 tileX, uint32 tileY)
+    bool StaticMapTree::CanLoadMap(const std::string& vmapPath, uint32 mapID, uint32 tileX, uint32 tileY, VMapManager2* vm)
     {
         std::string basePath = vmapPath;
         if (basePath.length() > 0 && (basePath[basePath.length() - 1] != '/' || basePath[basePath.length() - 1] != '\\'))
@@ -380,8 +408,12 @@ namespace VMAP
         }
         if (tiled)
         {
-            std::string tilefile = basePath + getTileFileName(mapID, tileX, tileY);
-            FILE* tf = fopen(tilefile.c_str(), "rb");
+            // PR3: route through OpenMapTileFile to inherit parent-tile
+            // fallback. Without this, child maps whose tile is owned by
+            // the parent return false from CanLoadMap and the server
+            // never even attempts the load.
+            TileFileOpenResult openResult = OpenMapTileFile(basePath, mapID, tileX, tileY, vm);
+            FILE* tf = openResult.File;
             if (!tf)
             {
                 success = false;
@@ -520,27 +552,13 @@ namespace VMAP
         }
         bool result = true;
 
-        std::string tilefile = iBasePath + getTileFileName(iMapID, tileX, tileY);
-        FILE* tf = fopen(tilefile.c_str(), "rb");
-        // Parent-map tile fallback. When the child map has no tile file for
-        // these coords, walk up the parent chain and try the parent's tile.
-        // Mirrors TC common/Collision/Maps/MapTree.cpp:246-255. Until WMO
-        // doodad extraction (Stage 4b) actually writes parent-owned content,
-        // this loop is dead code; PR1 stages the read side so the flip in
-        // PR2 is invisible to consumers.
-        if (!tf)
-        {
-            int32 parentMapId = vm->getParentMapId(iMapID);
-            while (parentMapId != -1 && !tf)
-            {
-                std::string parentTileFile = iBasePath + getTileFileName(uint32(parentMapId), tileX, tileY);
-                tf = fopen(parentTileFile.c_str(), "rb");
-                if (!tf)
-                {
-                    parentMapId = vm->getParentMapId(uint32(parentMapId));
-                }
-            }
-        }
+        // PR3: route through OpenMapTileFile so the parent-walk logic is
+        // shared with CanLoadMap and UnloadMapTile. result.UsedMapId is
+        // the mapID we actually opened (may be a parent); not needed yet
+        // by mangosthree's load path (we don't track tile-source per
+        // loaded entry) but maintained for TC parity and future use.
+        TileFileOpenResult openResult = OpenMapTileFile(iBasePath, iMapID, tileX, tileY, vm);
+        FILE* tf = openResult.File;
         if (tf)
         {
             char chunk[8];
@@ -629,8 +647,11 @@ namespace VMAP
         }
         if (tile->second) // File associated with tile
         {
-            std::string tilefile = iBasePath + getTileFileName(iMapID, tileX, tileY);
-            FILE* tf = fopen(tilefile.c_str(), "rb");
+            // PR3: parent-tile fallback at unload time matches the load
+            // path. Without this, unload of a parent-owned tile silently
+            // failed to release acquireModelInstance references.
+            TileFileOpenResult openResult = OpenMapTileFile(iBasePath, iMapID, tileX, tileY, vm);
+            FILE* tf = openResult.File;
             if (tf)
             {
                 bool result = true;

@@ -427,7 +427,7 @@ namespace VMAP
      */
     bool VMapManager2::existsMap(const char* pBasePath, unsigned int pMapId, int x, int y)
     {
-        return StaticMapTree::CanLoadMap(std::string(pBasePath), pMapId, x, y);
+        return StaticMapTree::CanLoadMap(std::string(pBasePath), pMapId, x, y, this);
     }
 
     void VMapManager2::getInstanceMapTree(InstanceTreeMap& instanceMapTree)

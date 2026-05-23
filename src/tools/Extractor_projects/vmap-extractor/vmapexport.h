@@ -44,7 +44,13 @@ enum ModelFlags
 {
     MOD_M2 = 1,
     MOD_WORLDSPAWN = 1 << 1,
-    MOD_HAS_BOUND = 1 << 2
+    MOD_HAS_BOUND = 1 << 2,
+    // Matches src/game/vmap/ModelInstance.h:50 (PR1). Tagged on spawns
+    // that came from a PARENT map's ADT data when extracting a child
+    // map. TileAssembler routes these into ParentTileEntries so the
+    // server can merge them in at runtime via VMapManager2::
+    // getParentMapId (PR1).
+    MOD_PARENT_SPAWN = 1 << 3
 };
 
 extern const char* szWorkDirWmo;

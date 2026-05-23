@@ -28,6 +28,8 @@
 #include "Platform/Define.h"
 #include "BIH.h"
 
+#include <cstdio>
+#include <string>
 #include <unordered_map>
 
 namespace VMAP
@@ -101,6 +103,32 @@ namespace VMAP
          * @return std::string The generated tile file name.
          */
         static std::string getTileFileName(uint32 mapID, uint32 tileX, uint32 tileY);
+
+        /**
+         * @brief Result of opening a vmap tile file, including which mapID
+         *        the open actually resolved to (which may differ from the
+         *        requested mapID when a parent map's tile is used as
+         *        fallback). Mirrors TC TileFileOpenResult at
+         *        tc-preservation/src/common/Collision/Maps/MapTree.h.
+         */
+        struct TileFileOpenResult
+        {
+            FILE* File;
+            uint32 UsedMapId;   ///< Mapping actually opened; equals requested mapID for native opens.
+        };
+
+        /**
+         * @brief Open a vmap tile file for (mapID, tileX, tileY). If the
+         *        child map has no tile file at those coords, walk up the
+         *        parent chain (`vm->getParentMapId`) and try each
+         *        ancestor's tile file. Returns {nullptr, mapID} on
+         *        complete failure. Caller owns the returned FILE*.
+         *
+         *        Centralizes the parent-fallback so LoadMapTile,
+         *        CanLoadMap, and UnloadMapTile route through one helper
+         *        (TC MapTree.cpp:OpenMapTileFile lines 238-260).
+         */
+        static TileFileOpenResult OpenMapTileFile(std::string const& basePath, uint32 mapID, uint32 tileX, uint32 tileY, VMapManager2* vm);
         /**
          * @brief Packs the tile ID from tile X and tile Y coordinates.
          *
@@ -126,7 +154,7 @@ namespace VMAP
          * @param tileY The tile Y coordinate.
          * @return bool True if the map can be loaded, false otherwise.
          */
-        static bool CanLoadMap(const std::string& basePath, uint32 mapID, uint32 tileX, uint32 tileY);
+        static bool CanLoadMap(const std::string& basePath, uint32 mapID, uint32 tileX, uint32 tileY, VMapManager2* vm);
 
         /**
          * @brief Constructor for StaticMapTree.

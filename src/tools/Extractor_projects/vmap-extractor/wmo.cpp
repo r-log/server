@@ -580,7 +580,7 @@ WMOGroup::~WMOGroup()
 }
 
 //WmoInstName is in the form MD5/name.wmo
-WMOInstance::WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint32 tileX, uint32 tileY, FILE* pDirfile)
+WMOInstance::WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint32 originalMapId, uint32 tileX, uint32 tileY, FILE* pDirfile)
 {
     pos = Vec3D(0, 0, 0);
 
@@ -644,6 +644,13 @@ WMOInstance::WMOInstance(MPQFile& f, const char* WmoInstName, uint32 mapID, uint
     if (tileX == 65 && tileY == 65)
     {
         flags |= MOD_WORLDSPAWN;
+    }
+    if (mapID != originalMapId)
+    {
+        // PR3: WMO placed via a parent map's WDT data. Tag for
+        // TileAssembler's ParentTileEntries route. Mirrors TC
+        // vmap4_extractor/wmo.cpp:566-569 (MapObject::Extract).
+        flags |= MOD_PARENT_SPAWN;
     }
     //write mapID, tileX, tileY, Flags, ID, Pos, Rot, Scale, Bound_lo, Bound_hi, name
     fwrite(&mapID, sizeof(uint32), 1, pDirfile);

@@ -44,13 +44,15 @@ namespace Doodad
     /// + scale + name). No bound is written; TileAssembler computes
     /// the M2 bounding box at assemble time.
     ///
-    /// For PR2 (no MOD_PARENT_SPAWN write) the spawn flags are always
-    /// MOD_M2; PR3 will extend the signature to thread originalMapId
-    /// through and gate MOD_PARENT_SPAWN when mapID != originalMapId.
+    /// PR3: when mapID != originalMapId the placement is inherited
+    /// from a parent map's ADT/WDT data — flag those spawns with
+    /// MOD_PARENT_SPAWN so TileAssembler routes them into
+    /// ParentTileEntries. Mirrors TC vmap4_extractor/model.cpp:279-280.
     void ExtractSet(WMODoodadData const& doodadData,
                     WMOInstance const& wmo,
                     bool isGlobalWmo,
                     uint32 mapID,
+                    uint32 originalMapId,
                     uint32 tileX,
                     uint32 tileY,
                     FILE* pDirfile);
