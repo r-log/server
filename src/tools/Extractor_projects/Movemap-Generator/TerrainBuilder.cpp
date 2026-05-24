@@ -688,7 +688,14 @@ namespace MMAP
                         uint8 type = NAV_EMPTY;
 
                         // convert liquid type to NavTerrain
-                        switch (liquid->GetType())
+                        // Mask to low 2 bits — WMO liquid types in Cata can
+                        // carry upper hint bits (e.g. 0x80000 lava marker)
+                        // that previously caused the switch to fall through
+                        // to NAV_EMPTY for the affected WMOs. Mirrors TC
+                        // commit 15a1e26 (#18364 — "Correct Nav type for
+                        // WMO objects"). Visible result: WMO interior liquid
+                        // surfaces are no longer skipped in the navmesh.
+                        switch (liquid->GetType() & 3)
                         {
                             case 0:
                             case 1:

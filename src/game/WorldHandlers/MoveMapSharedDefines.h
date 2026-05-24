@@ -29,7 +29,12 @@
 #include "Platform/Define.h"
 
 #define MMAP_MAGIC 0x4d4d4150   // 'MMAP'
-#define MMAP_VERSION 3
+// Version 6 matches TC's Cataclysm Preservation Project numbering after
+// the v5→v6 WMO liquid nav-type fix is applied (TerrainBuilder.cpp
+// liquid->GetType() & 3). The v3→v5 jump is unaccounted for in this
+// fork — we adopt TC's numbering for cross-fork clarity rather than
+// inventing a parallel v4. See MANGOS/STAGE6_MMAP_VERSION_PLAN.md.
+#define MMAP_VERSION 6
 
 struct MmapTileHeader
 {
