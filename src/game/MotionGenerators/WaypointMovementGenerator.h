@@ -100,7 +100,7 @@ class WaypointMovementGenerator<Creature>
          * @brief Constructor
          * @param creature Reference to the creature
          */
-        WaypointMovementGenerator(Creature&) : i_nextMoveTime(0), m_isArrivalDone(false), m_lastReachedWaypoint(0), m_pathId(0) {}
+        WaypointMovementGenerator(Creature&) : i_nextMoveTime(0), m_isArrivalDone(false), m_lastReachedWaypoint(0), m_pathId(0), m_incompleteRetries(0) {}
 
         /**
          * @brief Destructor
@@ -247,6 +247,12 @@ class WaypointMovementGenerator<Creature>
 
         int32 m_pathId; ///< Path ID
         WaypointPathOrigin m_PathOrigin; ///< Path origin
+        /// Consecutive PATHFIND_INCOMPLETE-style arrivals on the current
+        /// waypoint. Reset when the creature actually lands within
+        /// tolerance of its target. If it ever exceeds the retry cap we
+        /// log + force-advance to avoid getting stuck on an unreachable
+        /// waypoint. See WaypointMovementGenerator<Creature>::Update.
+        uint32 m_incompleteRetries;
 };
 
 /**

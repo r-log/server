@@ -372,8 +372,82 @@ bool WaypointMovementGenerator<Creature>::Update(Creature& creature, const uint3
         }
         else if (creature.movespline->Finalized())
         {
-            OnArrived(creature);
-            StartMove(creature);
+            // Stage 5 §2.3 partial-path-advance fix.
+            //
+            // PathFinder.calculate() can return PATHFIND_INCOMPLETE when
+            // the target waypoint isn't reachable from the current poly:
+            // the path it builds stops at the closest reachable poly,
+            // often several yards short of the actual waypoint. The
+            // spline plays to completion (so movespline->Finalized() is
+            // true) but the creature is geometrically nowhere near the
+            // waypoint it was trying to reach. Pre-fix behaviour: fire
+            // OnArrived anyway, advance to the next waypoint, recompute
+            // from the wrong starting position — visible symptom is the
+            // creature "stops halfway and wanders off path" before
+            // continuing from a later waypoint. Confirmed in-game via
+            // .mmap path output: type=4 (PATHFIND_INCOMPLETE), actual_end
+            // 13.3 yd short of target.
+            //
+            // Fix: when the spline finishes, check planar distance from
+            // creature position to the waypoint we were aiming at. If
+            // we're within ARRIVAL_TOLERANCE we arrived properly; reset
+            // the retry counter and proceed. Otherwise retry up to
+            // MAX_INCOMPLETE_RETRIES (recompute path from the new start
+            // — sometimes the closer poly does have a valid route to the
+            // target). After that, log + force-advance so we don't spin
+            // forever on a genuinely unreachable WP.
+            //
+            // Flying / levitating creatures bypass the check; their
+            // splines legitimately end off-grid relative to navmesh.
+            constexpr float ARRIVAL_TOLERANCE_SQ = 5.0f * 5.0f;
+            constexpr uint32 MAX_INCOMPLETE_RETRIES = 2;
+
+            bool incomplete = false;
+            if (!creature.IsFlying() && !creature.IsLevitating())
+            {
+                WaypointPath::const_iterator currPoint = i_path->find(i_currentNode);
+                if (currPoint != i_path->end())
+                {
+                    WaypointNode const& node = currPoint->second;
+                    float dx = creature.GetPositionX() - node.x;
+                    float dy = creature.GetPositionY() - node.y;
+                    if (dx * dx + dy * dy > ARRIVAL_TOLERANCE_SQ)
+                    {
+                        incomplete = true;
+                    }
+                }
+            }
+
+            if (incomplete)
+            {
+                ++m_incompleteRetries;
+                if (m_incompleteRetries > MAX_INCOMPLETE_RETRIES)
+                {
+                    sLog.outDetail(
+                        "WaypointMovementGenerator: waypoint %u unreachable "
+                        "for creature guidlow=%u entry=%u after %u retries; "
+                        "force-advancing. DB waypoint may need adjustment.",
+                        i_currentNode, creature.GetGUIDLow(),
+                        creature.GetEntry(), m_incompleteRetries);
+                    m_incompleteRetries = 0;
+                    OnArrived(creature);  // marks arrived; runs scripts
+                    StartMove(creature);  // advances currPoint, fires next
+                }
+                else
+                {
+                    // Re-launch toward the SAME waypoint from the new
+                    // (closer) position. StartMove only advances when
+                    // m_isArrivalDone == true, so skipping OnArrived
+                    // keeps us on i_currentNode.
+                    StartMove(creature);
+                }
+            }
+            else
+            {
+                m_incompleteRetries = 0;
+                OnArrived(creature);
+                StartMove(creature);
+            }
         }
     }
     return true;
