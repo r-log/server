@@ -675,6 +675,7 @@ class ChatHandler
         bool HandleQuitCommand(char* args);
         bool HandleShowGearScoreCommand(char* args);
 
+        bool HandleDebugLosCommand(char* args);
         bool HandleMmapPathCommand(char* args);
         bool HandleMmapLocCommand(char* args);
         bool HandleMmapLoadedTilesCommand(char* args);
