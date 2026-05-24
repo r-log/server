@@ -82,14 +82,21 @@ struct WMODoodadData
 /// the extractor process — memory cost is bounded by the WMO set size.
 extern std::unordered_map<std::string, WMODoodadData> WmoDoodads;
 
-// MOPY flags
-#define WMO_MATERIAL_NOCAMCOLLIDE    0x01
-#define WMO_MATERIAL_DETAIL          0x02
-#define WMO_MATERIAL_NO_COLLISION    0x04
-#define WMO_MATERIAL_HINT            0x08
-#define WMO_MATERIAL_RENDER          0x10
-#define WMO_MATERIAL_COLLIDE_HIT     0x20
-#define WMO_MATERIAL_WALL_SURFACE    0x40
+// MOPY flags (per-triangle material flags from the MOPY chunk).
+// Bit values match the WoW file-format specification documented at
+// https://wowdev.wiki/WMO#MOPY_chunk_.28material.2C_per_triangle.29 and
+// TrinityCore's vmap4_extractor/wmo.h. Previous mangosthree definitions
+// were shifted by one bit position vs the spec — keeping HINT-only
+// (lighting hint) triangles in the collision mesh, producing phantom
+// LoS blocks inside large WMOs like Stormwind Cathedral District.
+#define WMO_MATERIAL_UNK_0x01        0x01
+#define WMO_MATERIAL_NOCAMCOLLIDE    0x02
+#define WMO_MATERIAL_DETAIL          0x04
+#define WMO_MATERIAL_COLLISION       0x08
+#define WMO_MATERIAL_HINT            0x10
+#define WMO_MATERIAL_RENDER          0x20
+#define WMO_MATERIAL_CULL_OBJECTS    0x40
+#define WMO_MATERIAL_COLLIDE_HIT     0x80
 
 class WMOInstance;
 class WMOManager;
@@ -111,6 +118,10 @@ class WMORoot
         float bbcorn2[3];
         WMODoodadData DoodadData;  ///< parsed MODS/MODN/MODD; consumed by Doodad::ExtractSet
         std::unordered_set<uint32> ValidDoodadNames;  ///< MODN offsets whose .m2 extracted OK; mirrors TC tools/vmap4_extractor/wmo.h:91
+        /// MOGN chunk — packed null-terminated group-name blob. WMOGroup
+        /// indexes into this via groupName to detect "antiportal" groups
+        /// in ShouldSkip. Mirrors TC tools/vmap4_extractor/wmo.h.
+        std::vector<char> GroupNames;
 
         /**
          * @brief
@@ -173,6 +184,15 @@ struct WMOLiquidVert
 class WMOGroup
 {
     public:
+        /// Should this group be excluded from extraction? TC pattern: skip
+        /// groups flagged unreachable (MOGP 0x80) or antiportal (MOGP
+        /// 0x4000000 or group name == "antiportal"). Antiportal groups
+        /// are invisible occlusion volumes used for client-side rendering
+        /// culling; they should NOT contribute to LoS collision (cause
+        /// of phantom column blocks inside Sw_Cathedraldistrict.wmo and
+        /// other large WMOs). Mirrors TC tools/vmap4_extractor/wmo.cpp:497.
+        bool ShouldSkip(WMORoot const* root) const;
+
         // MOGP
         int groupName, descGroupName, mogpFlags;
         float bbcorn1[3];

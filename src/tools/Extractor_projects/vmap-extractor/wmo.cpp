@@ -148,6 +148,16 @@ bool WMORoot::open()
                 f.read(DoodadData.Spawns.data(), size);
             }
         }
+        else if (!strcmp(fourcc, "MOGN"))
+        {
+            // Packed null-terminated group-name blob; WMOGroup::ShouldSkip
+            // looks up its groupName index in here to detect "antiportal".
+            GroupNames.resize(size);
+            if (size)
+            {
+                f.read(GroupNames.data(), size);
+            }
+        }
         /*
         else if (!strcmp(fourcc,"MOTX"))
         {
@@ -205,6 +215,32 @@ WMORoot::~WMORoot()
 WMOGroup::WMOGroup(std::string& filename) : filename(filename),
     MOPY(0), MOVI(0), MoviEx(0), MOVT(0), MOBA(0), MobaEx(0), hlq(0), LiquEx(0), LiquBytes(0)
 {
+}
+
+bool WMOGroup::ShouldSkip(WMORoot const* root) const
+{
+    // Skip unreachable groups (MOGP bit 0x80). These exist for level
+    // streaming hints and are not real walkable areas.
+    if (mogpFlags & 0x80)
+    {
+        return true;
+    }
+    // Skip antiportal groups (MOGP bit 0x4000000). Antiportals are
+    // invisible occlusion volumes used for rendering culling — they
+    // must not appear in the collision mesh or LoS rays trip on
+    // invisible surfaces. Mirrors TC tools/vmap4_extractor/wmo.cpp:497.
+    if (mogpFlags & 0x4000000)
+    {
+        return true;
+    }
+    // Some antiportal groups are flagged by name instead of MOGP bit.
+    if (root && groupName >= 0 &&
+        static_cast<std::size_t>(groupName) < root->GroupNames.size() &&
+        !std::strcmp(&root->GroupNames[groupName], "antiportal"))
+    {
+        return true;
+    }
+    return false;
 }
 
 bool WMOGroup::open()
@@ -423,9 +459,18 @@ int WMOGroup::ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPrecis
         memset(IndexRenum, 0xFF, nVertices * sizeof(int));
         for (int i = 0; i < nTriangles; ++i)
         {
-            // Skip no collision triangles
-            if (MOPY[2 * i]&WMO_MATERIAL_NO_COLLISION ||
-                !(MOPY[2 * i] & (WMO_MATERIAL_HINT | WMO_MATERIAL_COLLIDE_HIT)))
+            // Keep a triangle if it is explicitly flagged as collision
+            // (F_COLLISION) OR if it is a render face that is not pure
+            // detail geometry (render-mesh contributes to collision unless
+            // the artist tagged it DETAIL). Mirrors TC vmap4_extractor
+            // wmo.cpp:396-400. Previous mangosthree logic checked HINT,
+            // a lighting-only flag — phantom-collision source inside
+            // large WMOs.
+            bool isRenderFace = (MOPY[2 * i] & WMO_MATERIAL_RENDER) &&
+                                !(MOPY[2 * i] & WMO_MATERIAL_DETAIL);
+            bool isCollision = (MOPY[2 * i] & WMO_MATERIAL_COLLISION) ||
+                               isRenderFace;
+            if (!isCollision)
             {
                 continue;
             }

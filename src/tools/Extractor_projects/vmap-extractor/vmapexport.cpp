@@ -645,6 +645,7 @@ bool ExtractSingleWmo(std::string& fname)
     }
     froot.ConvertToVMAPRootWmo(output);
     int Wmo_nVertices = 0;
+    uint32 groupCount = 0;  // count of groups actually written (post-ShouldSkip filter)
     //printf("root has %d groups\n", froot->nGroups);
     if (froot.nGroups != 0)
     {
@@ -666,7 +667,17 @@ bool ExtractSingleWmo(std::string& fname)
                 break;
             }
 
+            // Drop antiportal / unreachable groups before they reach the
+            // collision mesh — these are invisible occluder volumes used
+            // by the client renderer that must not contribute to LoS
+            // rays. Mirrors TC vmapexport.cpp:333-334.
+            if (fgroup.ShouldSkip(&froot))
+            {
+                continue;
+            }
+
             Wmo_nVertices += fgroup.ConvertToVMAPGroupWmo(output, &froot, preciseVectorData);
+            ++groupCount;
 
             // Aggregate this group's MODR references into the cached
             // WMODoodadData. Mirrors TC tools/vmap4_extractor/
@@ -694,6 +705,11 @@ bool ExtractSingleWmo(std::string& fname)
 
     fseek(output, 8, SEEK_SET); // store the correct no of vertices
     fwrite(&Wmo_nVertices, sizeof(int), 1, output);
+    // Overwrite the nGroups placeholder ConvertToVMAPRootWmo wrote at
+    // offset 12 with the post-filter groupCount. Without this, runtime
+    // reads the original nGroups and tries to load groups that were
+    // ShouldSkip-filtered, producing a parse mismatch.
+    fwrite(&groupCount, sizeof(uint32), 1, output);
     fclose(output);
 
     // Delete the extracted file in the case of an error
