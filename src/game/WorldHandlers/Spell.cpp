@@ -2321,13 +2321,13 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                     break;
                 }
 
-                if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next))
+                if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
                 {
                     ++next;
                     continue;
                 }
 
-                if (!prev->IsWithinLOSInMap(*next)
+                if (!prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2)
                     || (m_spellInfo->HasAttribute(SPELL_ATTR_EX6_IGNORE_CC_TARGETS) && !(*next)->CanFreeMove()))
                 {
                     ++next;
@@ -2420,7 +2420,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                         break;
                     }
 
-                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next))
+                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
                     {
                         ++next;
                         continue;
@@ -3252,7 +3252,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                         break;
                     }
 
-                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next))
+                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
                     {
                         ++next;
                         continue;
@@ -3371,7 +3371,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
 
                 float _target_x, _target_y, _target_z;
                 pTarget->GetClosePoint(_target_x, _target_y, _target_z, pTarget->GetObjectBoundingRadius(), radius, angle);
-                if (pTarget->IsWithinLOS(_target_x, _target_y, _target_z))
+                if (pTarget->IsWithinLOS(_target_x, _target_y, _target_z, VMAP::ModelIgnoreFlags::M2))
                 {
                     targetUnitMap.push_back(m_caster);
                     m_targets.setDestination(_target_x, _target_y, _target_z);
@@ -6572,7 +6572,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                 }
             }
 
-            if (!m_IsTriggeredSpell && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && VMAP::VMapFactory::checkSpellForLoS(m_spellInfo->Id) && !m_caster->IsWithinLOSInMap(target))
+            if (!m_IsTriggeredSpell && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->Id, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && VMAP::VMapFactory::checkSpellForLoS(m_spellInfo->Id) && !m_caster->IsWithinLOSInMap(target, VMAP::ModelIgnoreFlags::M2))
             {
                 return SPELL_FAILED_LINE_OF_SIGHT;
             }
@@ -9588,7 +9588,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
             // fall through
         case SPELL_EFFECT_RESURRECT_NEW:
             // player far away, maybe his corpse near?
-            if (target != m_caster && !m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(m_caster))
+            if (target != m_caster && !m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(m_caster, VMAP::ModelIgnoreFlags::M2))
             {
                 if (!m_targets.getCorpseTargetGuid())
                 {
@@ -9606,7 +9606,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
                     return false;
                 }
 
-                if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !corpse->IsWithinLOSInMap(m_caster))
+                if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !corpse->IsWithinLOSInMap(m_caster, VMAP::ModelIgnoreFlags::M2))
                 {
                     return false;
                 }
@@ -9620,7 +9620,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
             {
                 if (WorldObject* caster = GetCastingObject())
                 {
-                    if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(caster))
+                    if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(caster, VMAP::ModelIgnoreFlags::M2))
                     {
                         return false;
                     }
