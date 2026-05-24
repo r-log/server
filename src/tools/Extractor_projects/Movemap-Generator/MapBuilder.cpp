@@ -509,7 +509,19 @@ namespace MMAP
         config.borderSize = config.walkableRadius + 3;
         config.maxEdgeLen = VERTEX_PER_TILE + 1;        //anything bigger than tileSize
         config.walkableHeight = m_bigBaseUnit ? 3 : 6;
-        config.walkableClimb = m_bigBaseUnit ? 2 : 4;   // keep less than walkableHeight
+        // Raised 2|4 -> 3|6 to match TC's v10 tuning (commit e3bab35,
+        // PR #24539 "Adjust walkable climb and fix a lot of mmap raycast
+        // issues"). Recast also uses walkableClimb inside findNearestPoly
+        // to decide which poly contains a query point; the previous
+        // value was strict enough that door thresholds / small stairs
+        // / ledges around 1.0-1.6 yd were treated as walls, leaving the
+        // indoor and outdoor navmesh as disconnected islands. With this
+        // bump (~1.6 yd climb tolerance in fine mode) the indoor/outdoor
+        // poly graph stitches together at doorways, so creatures whose
+        // patrol waypoints cross door thresholds can actually pathfind
+        // through the door instead of shortcutting through the wall.
+        // Stays less than walkableHeight as the comment requires.
+        config.walkableClimb = m_bigBaseUnit ? 3 : 6;
         config.minRegionArea = rcSqr(60);
         config.mergeRegionArea = rcSqr(50);
         config.maxSimplificationError = 2.0f;       // eliminates most jagged edges (tinny polygons)

@@ -30,13 +30,16 @@
 
 #define MMAP_MAGIC 0x4d4d4150   // 'MMAP'
 // MMAP_VERSION lineage on this fork — see MANGOS/STAGE6_MMAP_VERSION_PLAN.md:
-//   v3 = pre-existing mangosthree state (frozen 2013-ish)
-//   v6 = WMO liquid nav-type mask (TC 15a1e26)
-//   v7 = walkable slope angle 60° -> 55° (TC f53708f)
-// v4/v5 and the v7-blocking intermediates (v8 tools merge, v9 Recast
-// bump, v10 walkable-climb, v11 multi-slope, v12 steep swap) are
-// catch-up targets parked in Phase B/C of the plan.
-#define MMAP_VERSION 7
+//   v3  = pre-existing mangosthree state (frozen 2013-ish)
+//   v6  = WMO liquid nav-type mask (TC 15a1e26)
+//   v7  = walkable slope angle 60° -> 55° (TC f53708f)
+//   v10 = walkable climb 4 -> 6 cells, ~1.6 yd (TC e3bab35, #24539)
+// v4/v5/v8/v9 and the v11/v12 intermediates remain parked in Phase B/C:
+//   v8  = tools merge sweep (no concrete bug)
+//   v9  = Recast library bump (src/ change skipped 2026-05-24, see plan)
+//   v11 = multi-slope handling (would require porting NAV_AREA_GROUND_STEEP)
+//   v12 = steep-vs-ground swap (depends on v11)
+#define MMAP_VERSION 10
 
 struct MmapTileHeader
 {
