@@ -29,12 +29,14 @@
 #include "Platform/Define.h"
 
 #define MMAP_MAGIC 0x4d4d4150   // 'MMAP'
-// Version 6 matches TC's Cataclysm Preservation Project numbering after
-// the v5→v6 WMO liquid nav-type fix is applied (TerrainBuilder.cpp
-// liquid->GetType() & 3). The v3→v5 jump is unaccounted for in this
-// fork — we adopt TC's numbering for cross-fork clarity rather than
-// inventing a parallel v4. See MANGOS/STAGE6_MMAP_VERSION_PLAN.md.
-#define MMAP_VERSION 6
+// MMAP_VERSION lineage on this fork — see MANGOS/STAGE6_MMAP_VERSION_PLAN.md:
+//   v3 = pre-existing mangosthree state (frozen 2013-ish)
+//   v6 = WMO liquid nav-type mask (TC 15a1e26)
+//   v7 = walkable slope angle 60° -> 55° (TC f53708f)
+// v4/v5 and the v7-blocking intermediates (v8 tools merge, v9 Recast
+// bump, v10 walkable-climb, v11 multi-slope, v12 steep swap) are
+// catch-up targets parked in Phase B/C of the plan.
+#define MMAP_VERSION 7
 
 struct MmapTileHeader
 {

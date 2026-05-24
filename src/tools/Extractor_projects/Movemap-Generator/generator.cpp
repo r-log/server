@@ -341,7 +341,7 @@ int finish(const char* message, int returnValue)
 int main(int argc, char** argv)
 {
     int mapnum = -1;
-    float maxAngle = 60.0f;
+    float maxAngle = 55.0f; // TC-tuned walkable slope; see MapBuilder.h ctor.
     int tileX = -1, tileY = -1;
     bool skipLiquid = false,
          skipContinents = false,

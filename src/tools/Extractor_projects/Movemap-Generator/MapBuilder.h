@@ -103,7 +103,13 @@ namespace MMAP
              * @param bigBaseUnit
              * @param offMeshFilePath
              */
-            MapBuilder(float maxWalkableAngle   = 60.f,
+            // Default walkable slope 55° — TC's tuned value (commit
+            // f53708f / MMAP v12 -> v13: "Restore single slope angle of
+            // 55°"). Stricter than the previous 60° default; produces
+            // a more conservative navmesh that prevents pathfinding from
+            // routing creatures up steep terrain where retail behavior
+            // wouldn't allow walking.
+            MapBuilder(float maxWalkableAngle   = 55.f,
                        bool skipLiquid          = false,
                        bool skipContinents      = false,
                        bool skipJunkMaps        = true,
