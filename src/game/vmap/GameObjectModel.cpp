@@ -74,7 +74,22 @@ void LoadGameObjectModelList()
         return;
     }
 
+    // Magic header check — propagated by vmap-assembler from the source
+    // written by gameobject_extract. Reject mismatches loudly rather than
+    // silently mis-parsing an older-format file (the previous layout had
+    // no magic and no isWmoFlag byte).
+    char magicProbe[sizeof(VMAP::RAW_VMAP_MAGIC)];
+    if (fread(magicProbe, sizeof(magicProbe), 1, model_list_file) <= 0
+        || std::memcmp(magicProbe, VMAP::RAW_VMAP_MAGIC, sizeof(VMAP::RAW_VMAP_MAGIC)) != 0)
+    {
+        sLog.outError("File %s magic mismatch — re-extract via the new vmap-extractor + vmap-assembler",
+                      VMAP::GAMEOBJECT_MODELS);
+        fclose(model_list_file);
+        return;
+    }
+
     uint32 name_length, displayId;
+    uint8 isWmoFlag;
     char buff[500];
     while (!feof(model_list_file))
     {
@@ -83,6 +98,17 @@ void LoadGameObjectModelList()
             sLog.outDebug("File %s seems to be corrupted", VMAP::GAMEOBJECT_MODELS);
             break;
         }
+        // isWmo flag between displayId and name_length per the post-magic
+        // layout. Read but not yet consumed — sets up the on-disk shape
+        // for a future change that would treat WMO and M2 GameObject
+        // collision differently. Cast to void so the read isn't optimized
+        // out and so static analysers don't warn about unused locals.
+        if (fread(&isWmoFlag, sizeof(uint8), 1, model_list_file) <= 0)
+        {
+            sLog.outDebug("File %s seems to be corrupted", VMAP::GAMEOBJECT_MODELS);
+            break;
+        }
+        (void)isWmoFlag;
         if (fread(&name_length, sizeof(uint32), 1, model_list_file) <= 0)
         {
             sLog.outDebug("File %s seems to be corrupted", VMAP::GAMEOBJECT_MODELS);

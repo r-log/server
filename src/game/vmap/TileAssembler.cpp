@@ -680,8 +680,24 @@ namespace VMAP
             return;
         }
 
+        // Verify + propagate the file magic written by gameobject_extract.
+        // Catches stale source files left over from older extractor runs
+        // before silently writing a corrupt destination file.
+        char magicProbe[sizeof(RAW_VMAP_MAGIC)];
+        if (fread(magicProbe, sizeof(magicProbe), 1, model_list) <= 0
+            || std::memcmp(magicProbe, RAW_VMAP_MAGIC, sizeof(RAW_VMAP_MAGIC)) != 0)
+        {
+            std::cout << std::endl << "File '" << GAMEOBJECT_MODELS
+                      << "' magic mismatch — was the source produced by an older extractor?" << std::endl;
+            fclose(model_list);
+            fclose(model_list_copy);
+            return;
+        }
+        fwrite(RAW_VMAP_MAGIC, sizeof(RAW_VMAP_MAGIC), 1, model_list_copy);
+
         // Buffers to read the display ID and model name
         uint32 name_length, displayId;
+        uint8 isWmoFlag;
         char buff[500];
 
         // Read until reaching the end of the model list file
@@ -695,6 +711,15 @@ namespace VMAP
                 {
                     std::cout << std::endl << "File '" << GAMEOBJECT_MODELS << "' seems to be corrupted" << std::endl;
                 }
+                break;
+            }
+
+            // isWmo flag (1 byte) — comes between displayId and name_length
+            // in the post-bump layout. Mirrors TC vmap4_extractor's per-row
+            // shape and lets the server route WMO vs M2 collision distinctly.
+            if (fread(&isWmoFlag, sizeof(uint8), 1, model_list) <= 0)
+            {
+                std::cout << std::endl << "File '" << GAMEOBJECT_MODELS << "' seems to be corrupted" << std::endl;
                 break;
             }
 
@@ -754,8 +779,11 @@ namespace VMAP
                 }
             }
 
-            // Copy data to the new file and append bounding box info
+            // Copy data to the new file and append bounding box info.
+            // Per-row layout matches the source plus the assembler-added
+            // bounds: displayId | isWmoFlag | name_length | name | v1 | v2.
             fwrite(&displayId, sizeof(uint32), 1, model_list_copy);
+            fwrite(&isWmoFlag, sizeof(uint8), 1, model_list_copy);
             fwrite(&name_length, sizeof(uint32), 1, model_list_copy);
             fwrite(&buff, sizeof(char), name_length, model_list_copy);
             fwrite(&bounds.low(), sizeof(Vector3), 1, model_list_copy);

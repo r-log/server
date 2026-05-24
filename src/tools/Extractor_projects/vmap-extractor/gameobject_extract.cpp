@@ -2,6 +2,7 @@
 #include "dbcfile.h"
 #include "adtfile.h"
 #include "vmapexport.h"
+#include "../../../game/vmap/VMapDefinitions.h"
 
 #include <algorithm>
 #include <stdio.h>
@@ -60,6 +61,14 @@ void ExtractGameobjectModels()
 
     FILE* model_list = fopen((basepath + "temp_gameobject_models").c_str(), "wb");
 
+    // Magic header — lets every downstream reader (vmap-assembler,
+    // server's GameObjectModel loader) sanity-check the file format
+    // before parsing. Mirrors TC's pattern at
+    // tc-preservation/src/tools/vmap4_extractor/gameobject_extract.cpp.
+    // Previously absent — a future format change here would silently
+    // mis-parse instead of failing loudly. Cost: 8 bytes once per file.
+    fwrite(VMAP::RAW_VMAP_MAGIC, sizeof(VMAP::RAW_VMAP_MAGIC), 1, model_list);
+
     for (DBCFile::Iterator it = dbc.begin(); it != dbc.end(); ++it)
     {
         path = it->getString(1);
@@ -82,8 +91,10 @@ void ExtractGameobjectModels()
         //strToLower(ch_ext);
 
         bool result = false;
+        bool isWmo = false;
         if (!strcmp(ch_ext, ".wmo"))
         {
+            isWmo = true;
             result = ExtractSingleWmo(path);
         }
         else if (!strcmp(ch_ext, ".mdl"))
@@ -101,7 +112,13 @@ void ExtractGameobjectModels()
         {
             uint32 displayId = it->getUInt(0);
             uint32 path_length = strlen(name);
+            // Per-row layout: displayId | isWmo | name_length | name.
+            // isWmo lets downstream consumers tell WMO-shaped from
+            // M2-shaped collision without re-parsing the name extension.
+            // Mirrors TC vmap4_extractor/gameobject_extract.cpp.
+            uint8 isWmoFlag = isWmo ? 1 : 0;
             fwrite(&displayId, sizeof(uint32), 1, model_list);
+            fwrite(&isWmoFlag, sizeof(uint8), 1, model_list);
             fwrite(&path_length, sizeof(uint32), 1, model_list);
             fwrite(name, sizeof(char), path_length, model_list);
         }
