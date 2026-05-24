@@ -339,7 +339,7 @@ void setMapMagicVersion(int iCoreNumber, char* magic)
         std::strcpy(magic,"v1.4");
         break;
     case CLIENT_CATA:
-        std::strcpy(magic,"c1.4");
+        std::strcpy(magic,"c1.5");
         break;
     case CLIENT_MOP:
         std::strcpy(magic,"p1.4");

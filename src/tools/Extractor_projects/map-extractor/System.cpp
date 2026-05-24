@@ -466,7 +466,11 @@ void ReadLiquidTypeTableDBC(int const locale)
 
 // Map file format data
 static char const* MAP_MAGIC         = "MAPS";
-static char const* MAP_VERSION_MAGIC = "c1.4";
+// "c1.5" = mangosthree's Cata map format after the water-minHeight fix
+// (TC commit d4b9063 / v13 -> v14). "c1.4" was the long-standing magic
+// from before. Stays a string here for mangosthree's expansion-tagged
+// convention (TC uses uint32 9/10 instead).
+static char const* MAP_VERSION_MAGIC = "c1.5";
 static char const* MAP_AREA_MAGIC    = "AREA";
 static char const* MAP_HEIGHT_MAGIC  = "MHGT";
 static char const* MAP_LIQUID_MAGIC  = "MLIQ";
@@ -1093,6 +1097,17 @@ bool ConvertADT(char* filename, char* filename2, uint32 build)
                 else
                 {
                     liquid_height[y][x] = CONF_use_minHeight;
+                    // Tiles without measured liquid still contribute to
+                    // minHeight, otherwise sparse-liquid maps end up with
+                    // a minHeight far above the floor of the missing
+                    // tiles and the server's water-level/floor checks
+                    // misclassify edges. Mirrors TC commit d4b9063
+                    // (v13 -> v14: "Fix water height redundancy algorithm
+                    // ignoring 'no water'").
+                    if (minHeight > CONF_use_minHeight)
+                    {
+                        minHeight = CONF_use_minHeight;
+                    }
                 }
             }
         }
