@@ -33,6 +33,11 @@
 // no MaNGOS framework dependencies so the tools can include it
 // without dragging the rest of GridMap.h's #include graph along.
 
+// MAP_VERSION_MAGIC lives in its own dependency-free header so the
+// map-extractor + ExtractorCommon.cpp can include it without dragging
+// Platform/Define.h's ACE deps along.
+#include "MapMagicDefines.h"
+
 struct GridMapFileHeader
 {
     uint32 mapMagic;

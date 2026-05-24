@@ -37,6 +37,7 @@
 #include "../loadlib/sl/wdt.h"
 //#include "sl/wdt.h"
 #include "../shared/ExtractorCommon.h"
+#include "../../../game/WorldHandlers/MapMagicDefines.h"
 #ifndef WIN32
 #include <unistd.h>
 #endif
@@ -466,11 +467,8 @@ void ReadLiquidTypeTableDBC(int const locale)
 
 // Map file format data
 static char const* MAP_MAGIC         = "MAPS";
-// "c1.5" = mangosthree's Cata map format after the water-minHeight fix
-// (TC commit d4b9063 / v13 -> v14). "c1.4" was the long-standing magic
-// from before. Stays a string here for mangosthree's expansion-tagged
-// convention (TC uses uint32 9/10 instead).
-static char const* MAP_VERSION_MAGIC = "c1.5";
+// MAP_VERSION_MAGIC is provided by GridMapDefines.h — see the include
+// near the top of this file. Centralised to kill the drift hazard.
 static char const* MAP_AREA_MAGIC    = "AREA";
 static char const* MAP_HEIGHT_MAGIC  = "MHGT";
 static char const* MAP_LIQUID_MAGIC  = "MLIQ";

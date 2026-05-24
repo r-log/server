@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "ExtractorCommon.h"
+#include "../../../game/WorldHandlers/MapMagicDefines.h"  // for MAP_VERSION_MAGIC (Cata case)
 
 #ifdef WIN32
 #include <direct.h>
@@ -339,7 +340,11 @@ void setMapMagicVersion(int iCoreNumber, char* magic)
         std::strcpy(magic,"v1.4");
         break;
     case CLIENT_CATA:
-        std::strcpy(magic,"c1.5");
+        // Single source of truth lives in GridMapDefines.h. Keeping the
+        // other CLIENT_* branches with literal strings — they belong to
+        // sibling-fork formats (CMaNGOS-classic, mangostwo, etc.) we
+        // don't own.
+        std::strcpy(magic, MAP_VERSION_MAGIC);
         break;
     case CLIENT_MOP:
         std::strcpy(magic,"p1.4");
