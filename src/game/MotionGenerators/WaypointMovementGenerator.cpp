@@ -307,8 +307,24 @@ void WaypointMovementGenerator<Creature>::StartMove(Creature& creature)
     creature.addUnitState(UNIT_STAT_ROAMING_MOVE);
 
     WaypointNode const& nextNode = currPoint->second;;
+
+    // Re-snap the stored DB Z to current terrain for walking creatures.
+    // Many waypoint paths (especially TBC-era starting zones whose
+    // terrain has been re-baked across expansions) carry stale Z values
+    // that no longer match the ground at (x, y) — without this snap the
+    // creature walks the spline suspended above or clipping into the
+    // floor. Flying/levitating creatures skip the snap so their stored
+    // air-route Z is preserved.
+    float destX = nextNode.x;
+    float destY = nextNode.y;
+    float destZ = nextNode.z;
+    if (!creature.IsFlying() && !creature.IsLevitating())
+    {
+        creature.UpdateGroundPositionZ(destX, destY, destZ);
+    }
+
     Movement::MoveSplineInit init(creature);
-    init.MoveTo(nextNode.x, nextNode.y, nextNode.z, true);
+    init.MoveTo(destX, destY, destZ, true);
 
     if (nextNode.orientation != 100 && nextNode.delay != 0)
     {

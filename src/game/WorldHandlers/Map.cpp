@@ -3095,10 +3095,20 @@ bool Map::GetReachableRandomPointOnGround(uint32 phaseMask, float& x, float& y, 
     float i_z = z + 1.0f;
 
     GetHitPosition(x, y, z + 1.0f, i_x, i_y, i_z, phaseMask, -0.5f);
-    i_z = z; // reset i_z to z value to avoid too much difference from original point before GetHeightInRange
-    // commented out, as this function has not been defined anywhere (previous cores or other repos)
-//    if (!GetHeightInRange(phaseMask, i_x, i_y, i_z)) // GetHeight can fail
-//        return false;
+
+    // Re-snap to the actual ground at the random destination. Previously
+    // this reset i_z to the caller's source Z, which made the downstream
+    // slope check (ac = fabs(z - i_z)) a no-op — any random point passed
+    // because i_z always equalled z. Symptom: creatures walked suspended
+    // when terrain undulated within the random radius. The original
+    // author wanted GetHeightInRange here but the function did not exist
+    // when this code was written; it has since been added (Map.cpp:2908).
+    // maxSearchDist 10 yards accommodates typical random-radius slopes
+    // up to the 50° limit the slope check enforces below.
+    if (!GetHeightInRange(phaseMask, i_x, i_y, i_z, 10.0f))
+    {
+        return false;
+    }
 
     // here we have a valid position but the point can have a big Z in some case
     // next code will check angle from 2 points
