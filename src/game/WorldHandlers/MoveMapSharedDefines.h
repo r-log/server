@@ -37,11 +37,29 @@ struct MmapTileHeader
     uint32 dtVersion;
     uint32 mmapVersion;
     uint32 size;
-    bool usesLiquids : 1;
+    char usesLiquids;
+    char padding[3];
 
     MmapTileHeader() : mmapMagic(MMAP_MAGIC), dtVersion(DT_NAVMESH_VERSION),
-        mmapVersion(MMAP_VERSION), size(0), usesLiquids(true) {}
+        mmapVersion(MMAP_VERSION), size(0), usesLiquids(true), padding() {}
 };
+
+// Mirrors TC's pattern — every byte of the 20-byte on-disk header is
+// explicitly accounted for. The previous `bool usesLiquids : 1` bitfield
+// left the upper 3 bytes of that storage word compiler-uninitialized,
+// so older .mmtile files have non-deterministic bytes at offsets 17-19.
+// The server only reads byte 16 (usesLiquids) so this is harmless at
+// runtime, but it made the file format non-portable across compilers
+// and blocked future format extensions from re-using the padding.
+static_assert(sizeof(MmapTileHeader) == 20,
+              "MmapTileHeader size must be 20; adjust the padding field");
+static_assert(sizeof(MmapTileHeader) == (sizeof(MmapTileHeader::mmapMagic) +
+                                         sizeof(MmapTileHeader::dtVersion) +
+                                         sizeof(MmapTileHeader::mmapVersion) +
+                                         sizeof(MmapTileHeader::size) +
+                                         sizeof(MmapTileHeader::usesLiquids) +
+                                         sizeof(MmapTileHeader::padding)),
+              "MmapTileHeader has uninitialized padding fields");
 
 enum NavTerrain
 {
