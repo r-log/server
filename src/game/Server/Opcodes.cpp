@@ -746,6 +746,14 @@ void InitializeOpcodes()
     OPCODE(SMSG_STABLE_RESULT,                           STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               );
     OPCODE(CMSG_STABLE_REVIVE_PET,                       STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleStableRevivePet           );
     OPCODE(CMSG_STABLE_SWAP_PET,                         STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleStableSwapPet             );
+    // Cata stable drag-and-drop is the only stable opcode the 4.3.4
+    // client actually sends -- it consolidates the WotLK
+    // STABLE_PET / UNSTABLE_PET / STABLE_SWAP_PET into one
+    // "move pet X to slot Y" message with a bit-packed guid payload.
+    // Routes to the same HandleStablePet that's already been ported
+    // to the Cata payload; the legacy registrations above stay
+    // registered as harmless dead opcodes for any non-retail client.
+    OPCODE(CMSG_SET_PET_SLOT,                            STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleStablePet                 );
     OPCODE(MSG_QUEST_PUSH_RESULT,                        STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQuestPushResult           );
     OPCODE(SMSG_PLAY_MUSIC,                              STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               );
     OPCODE(SMSG_PLAY_OBJECT_SOUND,                       STATUS_NEVER,    PROCESS_INPLACE,      &WorldSession::Handle_ServerSide               );
