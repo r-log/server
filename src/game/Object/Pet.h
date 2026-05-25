@@ -246,6 +246,14 @@ class Pet : public Creature
         /// before any caller has supplied one.
         int32 GetSlot() const { return m_petSlot; }
 
+        /// Move this in-world Pet to a different character_pet.slot value.
+        /// Used by the CMSG_STABLE_PET Cata handler when the player drags
+        /// the currently summoned pet to a different Call Pet 1..N pane.
+        /// Does NOT persist the change on its own -- the caller is expected
+        /// to follow up with SavePetToDB(PET_SAVE_AS_CURRENT), which will
+        /// route through the m_petSlot intercept and write the new slot.
+        void SetSlot(int32 slot) { m_petSlot = slot; }
+
         static void DeleteFromDB(uint32 guidlow, bool separate_transaction = true);
 
         void SetDeathState(DeathState s) override;          // overwrite virtual Creature::SetDeathState and Unit::SetDeathState
