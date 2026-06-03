@@ -79,7 +79,10 @@ void printUsage()
     printf("--bigBaseUnit [true|false] : Generate tile/map using bigger basic unit.\n");
     printf("--silent : Make script friendly. No wait for user input, error, completion.\n");
     printf("--offMeshInput [file.*] : Path to file containing off mesh connections data.\n");
-    printf("--threads [#] : Worker threads for per-map tile builds. 0=hardware_concurrency, 1=serial.\n\n");
+    printf("--threads [#] : Worker threads for per-map tile builds.\n");
+    printf("                0 (default) = auto-detect CPU cores; 1 = serial (original single-threaded path).\n");
+    printf("                Note: peak memory scales with thread count (each worker holds its own tile\n");
+    printf("                working set). On a low-RAM machine, lower this (e.g. --threads 2) or use 1.\n\n");
     printf("Exemple:\nmovemapgen (generate all mmap with default arg\n"
         "movemapgen 0 (generate map 0)\n"
         "movemapgen --tile 34,46 (builds only tile 34,46 of map 0)\n\n");
