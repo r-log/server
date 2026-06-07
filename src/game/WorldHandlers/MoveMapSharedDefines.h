@@ -40,6 +40,9 @@
 //   v11 = multi-slope handling (would require porting NAV_AREA_GROUND_STEEP)
 //   v12 = steep-vs-ground swap (depends on v11)
 //   v13 = mmtile tileX/tileY coordinate-swap fix (port of upstream ea1927454)
+//         + build ADT floor under liquid: drop the buggy
+//           "minLLevel > maxTLevel -> useTerrain=false" block, aligning with
+//           mangoszero/mangostwo which already removed it
 #define MMAP_VERSION 13
 
 struct MmapTileHeader
