@@ -39,7 +39,8 @@
 //   v9  = Recast library bump (src/ change skipped 2026-05-24, see plan)
 //   v11 = multi-slope handling (would require porting NAV_AREA_GROUND_STEEP)
 //   v12 = steep-vs-ground swap (depends on v11)
-#define MMAP_VERSION 10
+//   v13 = mmtile tileX/tileY coordinate-swap fix (port of upstream ea1927454)
+#define MMAP_VERSION 13
 
 struct MmapTileHeader
 {

@@ -288,7 +288,7 @@ namespace MMAP
         m_terrainBuilder->loadMap(mapID, tileX, tileY, meshData);
 
         // get model data
-        m_terrainBuilder->loadVMap(mapID, tileY, tileX, meshData);
+        m_terrainBuilder->loadVMap(mapID, tileX, tileY, meshData);
 
         // if there is no data, give up now
         if (!meshData.solidVerts.size() && !meshData.liquidVerts.size())
@@ -814,7 +814,7 @@ namespace MMAP
 
             // file output
             char fileName[255];
-            sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileY, tileX);
+            sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileX, tileY);
             FILE* file = fopen(fileName, "wb");
             if (!file)
             {
@@ -1005,7 +1005,7 @@ namespace MMAP
     bool MapBuilder::shouldSkipTile(uint32 mapID, uint32 tileX, uint32 tileY)
     {
         char fileName[255];
-        sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileY, tileX);
+        sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileX, tileY);
         FILE* file = fopen(fileName, "rb");
         if (!file)
         {
