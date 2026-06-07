@@ -33,7 +33,7 @@
 
 namespace VMAP
 {
-    const char VMAP_MAGIC[] = "VMAP_4.2";                       /**< used in final vmap files */
+    const char VMAP_MAGIC[] = "VMAP_4.3";                       /**< used in final vmap files (4.3 = 4-digit map id in tile filenames) */
     const char RAW_VMAP_MAGIC[] = "VMAPc08";                // used in extracted vmap files with raw data
     const char GAMEOBJECT_MODELS[] = "temp_gameobject_models";  /**< TODO */
 

@@ -70,7 +70,7 @@ namespace MMAP
         getDirContents(files, "maps");
         for (uint32 i = 0; i < files.size(); ++i)
         {
-            mapID = uint32(atoi(files[i].substr(0, 3).c_str()));
+            mapID = uint32(atoi(files[i].substr(0, 4).c_str()));
             if (m_tiles.find(mapID) == m_tiles.end())
             {
                 m_tiles.insert(make_pair(mapID, make_unique<set<uint32>>()));
@@ -82,7 +82,7 @@ namespace MMAP
         getDirContents(files, "vmaps", "*.vmtree");
         for (uint32 i = 0; i < files.size(); ++i)
         {
-            mapID = uint32(atoi(files[i].substr(0, 3).c_str()));
+            mapID = uint32(atoi(files[i].substr(0, 4).c_str()));
             m_tiles.insert(make_pair(mapID, make_unique<set<uint32>>()));
             count++;
         }
@@ -95,26 +95,28 @@ namespace MMAP
             set<uint32>* tiles = (*itr).second.get();
             mapID = (*itr).first;
 
-            sprintf(filter, "%03u*.vmtile", mapID);
+            sprintf(filter, "%04u*.vmtile", mapID);
             files.clear();
             getDirContents(files, "vmaps", filter);
             for (uint32 i = 0; i < files.size(); ++i)
             {
-                tileX = uint32(atoi(files[i].substr(7, 2).c_str()));
-                tileY = uint32(atoi(files[i].substr(4, 2).c_str()));
+                // 4-digit map id: MMMM_XX_YY.vmtile
+                tileX = uint32(atoi(files[i].substr(8, 2).c_str()));
+                tileY = uint32(atoi(files[i].substr(5, 2).c_str()));
                 tileID = StaticMapTree::packTileID(tileY, tileX);
 
                 tiles->insert(tileID);
                 count++;
             }
 
-            sprintf(filter, "%03u*", mapID);
+            sprintf(filter, "%04u*", mapID);
             files.clear();
             getDirContents(files, "maps", filter);
             for (uint32 i = 0; i < files.size(); ++i)
             {
-                tileY = uint32(atoi(files[i].substr(3, 2).c_str()));
-                tileX = uint32(atoi(files[i].substr(5, 2).c_str()));
+                // 4-digit map id: MMMMYYXX.map
+                tileY = uint32(atoi(files[i].substr(4, 2).c_str()));
+                tileX = uint32(atoi(files[i].substr(6, 2).c_str()));
                 tileID = StaticMapTree::packTileID(tileX, tileY);
 
                 if (tiles->insert(tileID).second)
@@ -438,7 +440,7 @@ namespace MMAP
         }
 
         char fileName[25];
-        sprintf(fileName, "mmaps/%03u.mmap", mapID);
+        sprintf(fileName, "mmaps/%04u.mmap", mapID);
 
         FILE* file = fopen(fileName, "wb");
         if (!file)
@@ -814,7 +816,7 @@ namespace MMAP
 
             // file output
             char fileName[255];
-            sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileX, tileY);
+            sprintf(fileName, "mmaps/%04u%02i%02i.mmtile", mapID, tileX, tileY);
             FILE* file = fopen(fileName, "wb");
             if (!file)
             {
@@ -1005,7 +1007,7 @@ namespace MMAP
     bool MapBuilder::shouldSkipTile(uint32 mapID, uint32 tileX, uint32 tileY)
     {
         char fileName[255];
-        sprintf(fileName, "mmaps/%03u%02i%02i.mmtile", mapID, tileX, tileY);
+        sprintf(fileName, "mmaps/%04u%02i%02i.mmtile", mapID, tileX, tileY);
         FILE* file = fopen(fileName, "rb");
         if (!file)
         {

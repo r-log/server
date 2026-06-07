@@ -43,7 +43,9 @@
 //         + build ADT floor under liquid: drop the buggy
 //           "minLLevel > maxTLevel -> useTerrain=false" block, aligning with
 //           mangoszero/mangostwo which already removed it
-#define MMAP_VERSION 13
+//   v14 = 4-digit map id in all tile filenames (.map/.mmtile/.mmap/.vmtree/
+//         .vmtile) for MoP map ids > 999; paired with VMAP_MAGIC "VMAP_4.3"
+#define MMAP_VERSION 14
 
 struct MmapTileHeader
 {

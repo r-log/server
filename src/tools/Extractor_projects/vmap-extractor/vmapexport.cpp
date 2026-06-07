@@ -477,7 +477,7 @@ void ParsMapFiles()
 
     for (unsigned int i = 0; i < map_count; ++i)
     {
-        sprintf(id, "%03u", map_ids[i].id);
+        sprintf(id, "%04u", map_ids[i].id);
         sprintf(fn, "World\\Maps\\%s\\%s.wdt", map_ids[i].name, map_ids[i].name);
         WDTFile WDT(fn, map_ids[i].name);
         if (!WDT.init(id, map_ids[i].id))
@@ -498,7 +498,7 @@ void ParsMapFiles()
             if (pit != mapIndexById.end())
             {
                 uint32 pIdx = pit->second;
-                sprintf(parentId, "%03u", map_ids[pIdx].id);
+                sprintf(parentId, "%04u", map_ids[pIdx].id);
                 char parentFn[512];
                 sprintf(parentFn, "World\\Maps\\%s\\%s.wdt", map_ids[pIdx].name, map_ids[pIdx].name);
                 parentWDT = new WDTFile(parentFn, map_ids[pIdx].name);
