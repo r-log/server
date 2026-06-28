@@ -110,17 +110,21 @@ namespace CombatFormulas
     }
 
     /// Physical-damage reduction fraction [0, 0.75] from armor vs an attacker of
-    /// `attackerLevel`. Characterizes m3's CURRENT two-tier behavior:
-    /// reduction = armor / (armor + K), K = 85*levelModifier + 400, with
-    /// levelModifier = level (+ 4.5*(level-59) for level > 59).
-    /// KNOWN BUG: the 4.3.4 client (15595 PaperDollFrame.lua) is THREE-tier and
-    /// adds +20*(level-80) for level > 80, so m3 under-counts K and over-mitigates
-    /// for attacker levels 81-85 (K(85): m3 17570 vs client 26070). Fix tracked
-    /// separately. The `armor` passed in is already post-armor-penetration.
+    /// `attackerLevel`. reduction = armor / (armor + K), K = 85*levelModifier + 400.
+    /// Three-tier level modifier, matching the 4.3.4 client verbatim
+    /// (15595 PaperDollFrame.lua, PaperDollFrame_GetArmorReduction):
+    ///   level > 80: level + 4.5*(level-59) + 20*(level-80)
+    ///   level > 59: level + 4.5*(level-59)
+    ///   else:       level
+    /// The +20*(level-80) tier is the Cata change WotLK lacked; without it the
+    /// server over-mitigates vs level 81+ attackers (K(85) = 26070, not 17570).
+    /// The `armor` passed in is already post-armor-penetration.
     inline float ArmorDamageReductionFraction(float armor, int32 attackerLevel)
     {
         float levelModifier = float(attackerLevel);
-        if (levelModifier > 59.0f)
+        if (levelModifier > 80.0f)
+            levelModifier = levelModifier + 4.5f * (levelModifier - 59.0f) + 20.0f * (levelModifier - 80.0f);
+        else if (levelModifier > 59.0f)
             levelModifier = levelModifier + 4.5f * (levelModifier - 59.0f);
 
         float tmpvalue = 0.1f * armor / (8.5f * levelModifier + 40.0f);
