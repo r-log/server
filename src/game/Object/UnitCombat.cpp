@@ -227,6 +227,9 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* pVictim, WeaponAttackT
 
     // bonus from skills is 0.04%
     int32 skillBonus  = 4 * (attackerMaxSkillValueForLevel - victimMaxSkillValueForLevel);
+    // Cata removed weapon/defense skill: dodge/parry vs higher-level targets
+    // scale by level, not skill (see CombatFormulas::Enemy{Dodge,Parry}LevelBonus).
+    int32 levelOffset = int32(pVictim->GetLevelForTarget(this)) - int32(GetLevelForTarget(pVictim));
     int32 sum = 0, tmp = 0;
     int32 roll = urand(0, 10000);
 
@@ -261,26 +264,31 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* pVictim, WeaponAttackT
     // only players can't dodge if attacker is behind
     if (pVictim->GetTypeId() != TYPEID_PLAYER || !from_behind)
     {
-        // Reduce dodge chance by attacker expertise rating
-        if (GetTypeId() == TYPEID_PLAYER)
+        // Units that can dodge at all (not stunned/totem -> base > 0) get the
+        // Cata level-based dodge bonus, applied before expertise.
+        if (dodge_chance > 0)
         {
-            dodge_chance -= int32(((Player*)this)->GetExpertiseDodgeOrParryReduction(attType) * 100);
-        }
-        else
-        {
-            dodge_chance -= GetTotalAuraModifier(SPELL_AURA_MOD_EXPERTISE) * 25;
-        }
+            dodge_chance += int32(CombatFormulas::EnemyDodgeLevelBonus(levelOffset) * 100.0f);
 
-        // Modify dodge chance by attacker SPELL_AURA_MOD_COMBAT_RESULT_CHANCE
-        dodge_chance += GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_COMBAT_RESULT_CHANCE, VICTIMSTATE_DODGE) * 100;
+            // Reduce dodge chance by attacker expertise rating
+            if (GetTypeId() == TYPEID_PLAYER)
+            {
+                dodge_chance -= int32(((Player*)this)->GetExpertiseDodgeOrParryReduction(attType) * 100);
+            }
+            else
+            {
+                dodge_chance -= GetTotalAuraModifier(SPELL_AURA_MOD_EXPERTISE) * 25;
+            }
 
-        tmp = dodge_chance;
-        if ((tmp > 0)                                       // check if unit _can_ dodge
-                && ((tmp -= skillBonus) > 0)
-                && roll < (sum += tmp))
-        {
-            DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "RollMeleeOutcomeAgainst: DODGE <%d, %d)", sum - tmp, sum);
-            return MELEE_HIT_DODGE;
+            // Modify dodge chance by attacker SPELL_AURA_MOD_COMBAT_RESULT_CHANCE
+            dodge_chance += GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_COMBAT_RESULT_CHANCE, VICTIMSTATE_DODGE) * 100;
+
+            tmp = dodge_chance;
+            if (tmp > 0 && roll < (sum += tmp))
+            {
+                DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "RollMeleeOutcomeAgainst: DODGE <%d, %d)", sum - tmp, sum);
+                return MELEE_HIT_DODGE;
+            }
         }
     }
 
@@ -288,19 +296,22 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* pVictim, WeaponAttackT
     // check if attack comes from behind, nobody can parry or block if attacker is behind if not have
     if (!from_behind || pVictim->HasAuraType(SPELL_AURA_MOD_PARRY_FROM_BEHIND_PERCENT))
     {
-        // Reduce parry chance by attacker expertise rating
-        if (GetTypeId() == TYPEID_PLAYER)
-        {
-            parry_chance -= int32(((Player*)this)->GetExpertiseDodgeOrParryReduction(attType) * 100);
-        }
-        else
-        {
-            parry_chance -= GetTotalAuraModifier(SPELL_AURA_MOD_EXPERTISE) * 25;
-        }
-
+        // Only units that can parry (base parry > 0, e.g. humanoids/players, and
+        // not flagged NO_PARRY) get the Cata level-based parry bonus, applied
+        // before expertise so the +3 (boss) jump survives high expertise.
         if (parry_chance > 0 && (pVictim->GetTypeId() == TYPEID_PLAYER || !(((Creature*)pVictim)->GetCreatureInfo()->ExtraFlags & CREATURE_FLAG_EXTRA_NO_PARRY)))
         {
-            parry_chance -= skillBonus;
+            parry_chance += int32(CombatFormulas::EnemyParryLevelBonus(levelOffset) * 100.0f);
+
+            // Reduce parry chance by attacker expertise rating
+            if (GetTypeId() == TYPEID_PLAYER)
+            {
+                parry_chance -= int32(((Player*)this)->GetExpertiseDodgeOrParryReduction(attType) * 100);
+            }
+            else
+            {
+                parry_chance -= GetTotalAuraModifier(SPELL_AURA_MOD_EXPERTISE) * 25;
+            }
 
             // if (from_behind) -- only 100% currently and not 100% sure way value apply
             //    parry_chance = int32(parry_chance * (pVictim->GetTotalAuraMultiplier(SPELL_AURA_MOD_PARRY_FROM_BEHIND_PERCENT) - 1);
@@ -647,6 +658,8 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* pVictim, SpellEntry const* spell)
     // bonus from skills is 0.04% per skill Diff
     int32 attackerWeaponSkill = GetMaxSkillValueForLevel();
     int32 skillDiff = attackerWeaponSkill - int32(pVictim->GetMaxSkillValueForLevel(this));
+    // Cata: dodge/parry vs higher-level targets scale by level, not skill.
+    int32 levelOffset = int32(pVictim->GetLevelForTarget(this)) - int32(GetLevelForTarget(pVictim));
 
     //is this to get a better spread and not have to resort to floats?
     uint32 roll = urand(0, 10000);
@@ -757,7 +770,13 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* pVictim, SpellEntry const* spell)
     if (canDodge)
     {
         // Roll dodge
-        int32 dodgeChance = int32(pVictim->GetUnitDodgeChance() * 100.0f) - skillDiff * 4;
+        float baseDodge = pVictim->GetUnitDodgeChance();
+        int32 dodgeChance = int32(baseDodge * 100.0f);
+        // Cata level-based dodge bonus (only units that can dodge get it)
+        if (baseDodge > 0.0f)
+        {
+            dodgeChance += int32(CombatFormulas::EnemyDodgeLevelBonus(levelOffset) * 100.0f);
+        }
         // Reduce enemy dodge chance by SPELL_AURA_MOD_COMBAT_RESULT_CHANCE
         dodgeChance += GetTotalAuraModifierByMiscValue(SPELL_AURA_MOD_COMBAT_RESULT_CHANCE, VICTIMSTATE_DODGE) * 100;
         // Reduce dodge chance by attacker expertise rating
@@ -784,7 +803,14 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* pVictim, SpellEntry const* spell)
     if (canParry)
     {
         // Roll parry
-        int32 parryChance = int32(pVictim->GetUnitParryChance() * 100.0f)  - skillDiff * 4;
+        float baseParry = pVictim->GetUnitParryChance();
+        int32 parryChance = int32(baseParry * 100.0f);
+        // Cata level-based parry bonus (only units that can parry get it; the
+        // +3 (boss) jump to 14% must apply before expertise)
+        if (baseParry > 0.0f)
+        {
+            parryChance += int32(CombatFormulas::EnemyParryLevelBonus(levelOffset) * 100.0f);
+        }
         // Reduce parry chance by attacker expertise rating
         if (GetTypeId() == TYPEID_PLAYER)
         {

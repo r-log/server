@@ -155,3 +155,26 @@ TEST_CASE("combat: armor damage reduction fraction")
     CHECK(ArmorDamageReductionFraction(3.0f*26070.0f, 85) == doctest::Approx(0.75f));
     CHECK(ArmorDamageReductionFraction(1.0e9f, 85)     == doctest::Approx(0.75f));
 }
+
+TEST_CASE("combat: enemy dodge/parry level bonus")
+{
+    // 4.3.4 client (PaperDollFrame.lua): with a 5.0% creature base, total enemy
+    // avoidance by levelOffset (victimLevel - attackerLevel, 0..3, 3 = boss):
+    //   dodge: 5.0 / 5.5 / 6.0 / 6.5   parry: 5.0 / 5.5 / 6.0 / 14.0
+    const float base = 5.0f;
+    CHECK(base + EnemyDodgeLevelBonus(0) == doctest::Approx(5.0f));
+    CHECK(base + EnemyDodgeLevelBonus(1) == doctest::Approx(5.5f));
+    CHECK(base + EnemyDodgeLevelBonus(2) == doctest::Approx(6.0f));
+    CHECK(base + EnemyDodgeLevelBonus(3) == doctest::Approx(6.5f));
+    CHECK(base + EnemyDodgeLevelBonus(5) == doctest::Approx(6.5f));   // capped at +3
+
+    CHECK(base + EnemyParryLevelBonus(0) == doctest::Approx(5.0f));
+    CHECK(base + EnemyParryLevelBonus(1) == doctest::Approx(5.5f));
+    CHECK(base + EnemyParryLevelBonus(2) == doctest::Approx(6.0f));
+    CHECK(base + EnemyParryLevelBonus(3) == doctest::Approx(14.0f));  // boss jump
+    CHECK(base + EnemyParryLevelBonus(7) == doctest::Approx(14.0f));  // capped at +3
+
+    // Negative offsets (attacking lower targets) reduce avoidance by 0.5%/level.
+    CHECK(EnemyDodgeLevelBonus(-2) == doctest::Approx(-1.0f));
+    CHECK(EnemyParryLevelBonus(-2) == doctest::Approx(-1.0f));
+}

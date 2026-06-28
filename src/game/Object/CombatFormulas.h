@@ -136,6 +136,30 @@ namespace CombatFormulas
             tmpvalue = 0.75f;
         return tmpvalue;
     }
+
+    /// Level-based bonus (in percent) added to an enemy's DODGE chance, where
+    /// `levelOffset` = victimLevel - attackerLevel. Matches the 4.3.4 client
+    /// (PaperDollFrame.lua BASE_ENEMY_DODGE_CHANCE minus the 5% base): +0.5%
+    /// per level, capped at the +3 (boss) tier -> +1.5% (5.0% -> 6.5%). Negative
+    /// offsets (attacking lower targets) reduce avoidance by 0.5%/level.
+    inline float EnemyDodgeLevelBonus(int32 levelOffset)
+    {
+        if (levelOffset > 3)
+            levelOffset = 3;
+        return levelOffset * 0.5f;
+    }
+
+    /// Level-based bonus (in percent) added to an enemy's PARRY chance, where
+    /// `levelOffset` = victimLevel - attackerLevel. Matches the 4.3.4 client
+    /// (PaperDollFrame.lua BASE_ENEMY_PARRY_CHANCE minus the 5% base): +0.5%
+    /// per level for +1/+2, then a jump to +9.0% at the +3 (boss) tier
+    /// (5.0% -> 14.0%). Negative offsets reduce avoidance by 0.5%/level.
+    inline float EnemyParryLevelBonus(int32 levelOffset)
+    {
+        if (levelOffset >= 3)
+            return 9.0f;
+        return levelOffset * 0.5f;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
