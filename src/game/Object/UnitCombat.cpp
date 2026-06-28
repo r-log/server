@@ -44,6 +44,7 @@
 #include "Formulas.h"
 #include "Pet.h"
 #include "Util.h"
+#include "CombatFormulas.h"
 #include "Totem.h"
 #include "Vehicle.h"
 #include "BattleGround/BattleGround.h"
@@ -321,11 +322,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* pVictim, WeaponAttackT
         pVictim->GetTypeId() != TYPEID_PLAYER && !((Creature*)pVictim)->IsPet() &&
         getLevel() < pVictim->GetLevelForTarget(this))
     {
-        // cap possible value (with bonuses > max skill)
-        int32 skill = attackerMaxSkillValueForLevel;
-
-        tmp = 600 + (victimMaxSkillValueForLevel - skill) * 120;
-        tmp = tmp > 4000 ? 4000 : tmp;
+        tmp = CombatFormulas::GlancingChanceBasisPoints(attackerMaxSkillValueForLevel, victimMaxSkillValueForLevel);
         if (roll < (sum += tmp))
         {
             DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "RollMeleeOutcomeAgainst: GLANCING <%d, %d)", sum - tmp, sum);
