@@ -55,6 +55,7 @@
 #include "VMapFactory.h"
 #include "CreatureLinkingMgr.h"
 #include "GameTime.h"
+#include "CombatFormulas.h"
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #include "ElunaConfig.h"
@@ -260,14 +261,8 @@ void Unit::CalculateMeleeDamage(Unit* pVictim, CalcDamageInfo* damageInfo, Weapo
             damageInfo->TargetState = VICTIMSTATE_NORMAL;
             damageInfo->procEx |= PROC_EX_NORMAL_HIT;
 
-            // Cata 4.0.1: flat 10%-per-level-diff reduction, capped at 3 levels (boss = -30%).
-            // Class- and weapon-skill-agnostic; the random damage window was removed in 4.0.1.
             int32 leveldif = int32(damageInfo->target->getLevel()) - int32(getLevel());
-            if (leveldif > 3)
-            {
-                leveldif = 3;
-            }
-            float reducePercent = 1.0f - leveldif * 0.1f;
+            float reducePercent = CombatFormulas::GlancingDamageMultiplier(leveldif);
 
             damageInfo->cleanDamage += damageInfo->damage - uint32(reducePercent * damageInfo->damage);
             damageInfo->damage = uint32(reducePercent * damageInfo->damage);
@@ -278,8 +273,7 @@ void Unit::CalculateMeleeDamage(Unit* pVictim, CalcDamageInfo* damageInfo, Weapo
             damageInfo->HitInfo     |= HITINFO_CRUSHING;
             damageInfo->TargetState  = VICTIMSTATE_NORMAL;
             damageInfo->procEx |= PROC_EX_NORMAL_HIT;
-            // 150% normal damage
-            damageInfo->damage += (damageInfo->damage / 2);
+            damageInfo->damage = CombatFormulas::ApplyCrushingDamage(damageInfo->damage);
             break;
         }
         default:

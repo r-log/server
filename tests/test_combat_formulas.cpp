@@ -60,3 +60,23 @@ TEST_CASE("combat: melee miss skill reduction")
     CHECK(MeleeMissSkillReduction(-15, true)  == doctest::Approx(-0.6f)); // vs player: miss 5.6%
     CHECK(MeleeMissSkillReduction(-5, false)  == doctest::Approx(-0.5f)); // NPC, -5 skill: miss 5.5%
 }
+
+TEST_CASE("combat: glancing damage multiplier")
+{
+    // Cata 4.0.1 flat model: 10% reduction per level the victim is above the
+    // attacker, capped at 3 levels. +3 raid boss = 0.70 (-30%) is web-verified;
+    // intermediate per-level steps pin the current 4.0.1 implementation.
+    CHECK(GlancingDamageMultiplier(0) == doctest::Approx(1.0f));
+    CHECK(GlancingDamageMultiplier(1) == doctest::Approx(0.9f));
+    CHECK(GlancingDamageMultiplier(2) == doctest::Approx(0.8f));
+    CHECK(GlancingDamageMultiplier(3) == doctest::Approx(0.7f));  // +3 raid boss: 70%
+    CHECK(GlancingDamageMultiplier(6) == doctest::Approx(0.7f));  // capped at 3 levels
+}
+
+TEST_CASE("combat: crushing blow damage (150%)")
+{
+    CHECK(ApplyCrushingDamage(100) == 150u);
+    CHECK(ApplyCrushingDamage(101) == 151u);  // integer: 101 + 101/2
+    CHECK(ApplyCrushingDamage(3)   == 4u);    // 3 + 3/2
+    CHECK(ApplyCrushingDamage(0)   == 0u);
+}

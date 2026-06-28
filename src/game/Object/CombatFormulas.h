@@ -70,6 +70,24 @@ namespace CombatFormulas
         else
             return skillDiff * 0.1f;
     }
+
+    /// Glancing-blow damage multiplier (Cata 4.0.1): flat 10% reduction per level
+    /// the victim is above the attacker, capped at 3 levels (raid boss = 0.70,
+    /// i.e. -30%). The pre-4.0.1 weapon-skill random window is gone. Only used
+    /// for white melee from a player/pet against a higher-level mob (caller-gated).
+    inline float GlancingDamageMultiplier(int32 levelDiff)
+    {
+        if (levelDiff > 3)
+            levelDiff = 3;
+        return 1.0f - levelDiff * 0.1f;
+    }
+
+    /// Crushing-blow damage: 150% of normal, matching the integer form used in
+    /// combat (base + base / 2). Version-invariant across vanilla -> Cata.
+    inline uint32 ApplyCrushingDamage(uint32 baseDamage)
+    {
+        return baseDamage + baseDamage / 2;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
