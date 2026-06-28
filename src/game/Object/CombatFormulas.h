@@ -46,6 +46,16 @@ namespace CombatFormulas
             chance = 4000;
         return chance;
     }
+
+    /// Crushing chance in basis points: max(attackerMaxSkill - victimMaxSkill, 20)
+    /// * 2% - 15%. May be <= 0; the caller gates eligibility and a > 0 check.
+    inline int32 CrushingChanceBasisPoints(int32 attackerMaxSkill, int32 victimMaxSkill)
+    {
+        int32 skillDiff = attackerMaxSkill - victimMaxSkill;
+        if (skillDiff < 20)
+            skillDiff = 20;
+        return skillDiff * 200 - 1500;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H

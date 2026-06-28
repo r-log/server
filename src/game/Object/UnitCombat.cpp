@@ -368,12 +368,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* pVictim, WeaponAttackT
     // and the Cataclysm-Preservation TrinityCore 4.3.4 reference impl.
     if ((getLevel() - 4) >= pVictim->getLevel() && !IsNonMeleeSpellCasted(false) /* It should have been !spellCasted but wrath doesn't have that? */)
     {
-        // skill_diff = attacker_skill - victim_skill, both = level*5.
-        // 3.0.2 floor: minimum 20 skill points (= 4-level diff).
-        int32 crush_chance = attackerMaxSkillValueForLevel - victimMaxSkillValueForLevel;
-        if (crush_chance < 20)
-            crush_chance = 20;
-        crush_chance = crush_chance * 200 - 1500;  // basis points; 10000 = 100%
+        int32 crush_chance = CombatFormulas::CrushingChanceBasisPoints(attackerMaxSkillValueForLevel, victimMaxSkillValueForLevel);
 
         if (crush_chance > 0 && roll < (sum += crush_chance))
         {

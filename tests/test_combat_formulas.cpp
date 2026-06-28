@@ -41,3 +41,11 @@ TEST_CASE("combat: glancing chance (basis points)")
     CHECK(GlancingChanceBasisPoints(100, 130) == 4000);  // +6 NPC ceiling -> capped 40%
     CHECK(GlancingChanceBasisPoints(100, 200) == 4000);  // far above -> still capped
 }
+
+TEST_CASE("combat: crushing chance (basis points)")
+{
+    CHECK(CrushingChanceBasisPoints(120, 100) == 2500);  // diff 20 -> 25%
+    CHECK(CrushingChanceBasisPoints(125, 100) == 3500);  // diff 25 -> 35%
+    CHECK(CrushingChanceBasisPoints(105, 100) == 2500);  // diff 5 floored to 20 -> 25%
+    CHECK(CrushingChanceBasisPoints(100, 100) == 2500);  // diff 0 floored to 20 -> 25%
+}
