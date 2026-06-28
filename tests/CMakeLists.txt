@@ -4,15 +4,24 @@
 # unaffected. doctest is a single, vendored header (tests/doctest/doctest.h);
 # nothing extra is fetched at configure time.
 #
-# This is the standalone harness scaffold: it has no dependency on the game
-# library yet. Linkage against `game`/`shared` is introduced together with the
-# first tests that exercise engine code.
+# The harness links the `game` static library so tests can exercise real
+# engine code. `game` is PUBLIC-linked, so its include directories and
+# transitive deps (shared + dep/*) propagate automatically; we mirror mangosd's
+# remaining explicit links (Threads/DL/OpenSSL).
 
 file(GLOB MANGOS_TEST_SOURCES *.cpp)
 
 add_executable(mangos_tests ${MANGOS_TEST_SOURCES})
 
 target_include_directories(mangos_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(mangos_tests
+    PRIVATE
+        game
+        Threads::Threads
+        DL::DL
+        ${OPENSSL_LIBRARIES}
+)
 
 set_target_properties(mangos_tests PROPERTIES
     CXX_STANDARD 17
