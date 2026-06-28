@@ -1017,18 +1017,7 @@ float Unit::MeleeMissChanceCalc(const Unit* pVictim, WeaponAttackType attType) c
     // PvP - PvE melee chances
     // TODO: implement diminishing returns for defense from player's defense rating
     // pure skill diff is not sufficient since 3.x anymore, but exact formulas hard to research
-    if (pVictim->GetTypeId() == TYPEID_PLAYER)
-    {
-        missChance -= skillDiff * 0.04f;
-    }
-    else if (skillDiff < -10)
-    {
-        missChance -= (skillDiff + 10) * 0.4f - 1.0f;
-    }
-    else
-    {
-        missChance -=  skillDiff * 0.1f;
-    }
+    missChance -= CombatFormulas::MeleeMissSkillReduction(skillDiff, pVictim->GetTypeId() == TYPEID_PLAYER);
 
     // Hit chance bonus from attacker based on ratings and auras
     if (attType == RANGED_ATTACK)

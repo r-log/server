@@ -56,6 +56,20 @@ namespace CombatFormulas
             skillDiff = 20;
         return skillDiff * 200 - 1500;
     }
+
+    /// Skill-based reduction (percent) subtracted from the 5% base melee miss
+    /// chance. PvP (victim is a player) uses a 0.04/skill slope; PvE uses 0.1,
+    /// with a steeper 0.4 slope below the -10 skill-diff threshold. Dual-wield,
+    /// hit-rating and aura modifiers stay in Unit::MeleeMissChanceCalc.
+    inline float MeleeMissSkillReduction(int32 skillDiff, bool victimIsPlayer)
+    {
+        if (victimIsPlayer)
+            return skillDiff * 0.04f;
+        else if (skillDiff < -10)
+            return (skillDiff + 10) * 0.4f - 1.0f;
+        else
+            return skillDiff * 0.1f;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
