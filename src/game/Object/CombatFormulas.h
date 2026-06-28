@@ -108,6 +108,30 @@ namespace CombatFormulas
     {
         return classScalar / ratingPerPercent;
     }
+
+    /// Physical-damage reduction fraction [0, 0.75] from armor vs an attacker of
+    /// `attackerLevel`. Characterizes m3's CURRENT two-tier behavior:
+    /// reduction = armor / (armor + K), K = 85*levelModifier + 400, with
+    /// levelModifier = level (+ 4.5*(level-59) for level > 59).
+    /// KNOWN BUG: the 4.3.4 client (15595 PaperDollFrame.lua) is THREE-tier and
+    /// adds +20*(level-80) for level > 80, so m3 under-counts K and over-mitigates
+    /// for attacker levels 81-85 (K(85): m3 17570 vs client 26070). Fix tracked
+    /// separately. The `armor` passed in is already post-armor-penetration.
+    inline float ArmorDamageReductionFraction(float armor, int32 attackerLevel)
+    {
+        float levelModifier = float(attackerLevel);
+        if (levelModifier > 59.0f)
+            levelModifier = levelModifier + 4.5f * (levelModifier - 59.0f);
+
+        float tmpvalue = 0.1f * armor / (8.5f * levelModifier + 40.0f);
+        tmpvalue = tmpvalue / (1.0f + tmpvalue);
+
+        if (tmpvalue < 0.0f)
+            tmpvalue = 0.0f;
+        if (tmpvalue > 0.75f)
+            tmpvalue = 0.75f;
+        return tmpvalue;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H

@@ -42,6 +42,7 @@
 #include "CreatureAI.h"
 #include "TemporarySummon.h"
 #include "Formulas.h"
+#include "CombatFormulas.h"
 #include "Pet.h"
 #include "Util.h"
 #include "Totem.h"
@@ -103,23 +104,7 @@ uint32 Unit::CalcArmorReducedDamage(Unit* pVictim, const uint32 damage)
         armor = 0.0f;
     }
 
-    float levelModifier = (float)getLevel();
-    if (levelModifier > 59)
-    {
-        levelModifier = levelModifier + (4.5f * (levelModifier - 59));
-    }
-
-    float tmpvalue = 0.1f * armor / (8.5f * levelModifier + 40);
-    tmpvalue = tmpvalue / (1.0f + tmpvalue);
-
-    if (tmpvalue < 0.0f)
-    {
-        tmpvalue = 0.0f;
-    }
-    if (tmpvalue > 0.75f)
-    {
-        tmpvalue = 0.75f;
-    }
+    float tmpvalue = CombatFormulas::ArmorDamageReductionFraction(armor, getLevel());
 
     newdamage = uint32(damage - (damage * tmpvalue));
 

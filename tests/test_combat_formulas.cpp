@@ -133,3 +133,29 @@ TEST_CASE("combat: rating multiplier grounded in our 15595 GameTables")
     // 179.28 crit rating yields exactly 1% crit at level 85:
     CHECK(critRatingPerPct * CombatRatingMultiplier(critScalar, critRatingPerPct) == doctest::Approx(1.0f));
 }
+
+TEST_CASE("combat: armor damage reduction fraction")
+{
+    // reduction = armor / (armor + K), K = 85*levelModifier + 400, capped 0.75.
+    // armor == K therefore yields exactly 50%.
+    //
+    // Levels <= 80: m3 MATCHES the 4.3.4 client (15595 PaperDollFrame.lua).
+    // These K values are client-correct (K = 467.5*level - 22167.5 for 60..80).
+    CHECK(ArmorDamageReductionFraction(0.0f, 85)       == doctest::Approx(0.0f));
+    CHECK(ArmorDamageReductionFraction(10557.5f, 70)   == doctest::Approx(0.5f));   // K(70)
+    CHECK(ArmorDamageReductionFraction(15232.5f, 80)   == doctest::Approx(0.5f));   // K(80)
+    CHECK(ArmorDamageReductionFraction(2950.0f, 30)    == doctest::Approx(0.5f));   // <60: K=85*30+400
+    CHECK(ArmorDamageReductionFraction(1.0e9f, 85)     == doctest::Approx(0.75f));  // 75% cap
+
+    // Levels 81-85: CHARACTERIZATION of m3's CURRENT (BUGGY) two-tier output.
+    // The client adds +20*(level-80) for level > 80, which m3 omits, so m3's K
+    // is too small and it over-mitigates. These pin current behavior; when the
+    // three-tier fix lands, update K to the client values noted alongside.
+    CHECK(ArmorDamageReductionFraction(16635.0f, 83)   == doctest::Approx(0.5f));   // m3 K(83)=16635 (client: 21735)
+    CHECK(ArmorDamageReductionFraction(17570.0f, 85)   == doctest::Approx(0.5f));   // m3 K(85)=17570 (client: 26070)
+
+    // Concrete proof of over-mitigation: vs a level-85 attacker, a target with
+    // armor == client-correct K(85)=26070 should reduce exactly 50% on retail,
+    // but m3 currently reduces ~59.7% (= 26070 / (26070 + 17570)).
+    CHECK(ArmorDamageReductionFraction(26070.0f, 85)   == doctest::Approx(0.59739f));
+}
