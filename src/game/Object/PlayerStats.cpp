@@ -75,6 +75,7 @@
 #include "Vehicle.h"
 #include "Calendar.h"
 #include "DisableMgr.h"
+#include "CombatFormulas.h"
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #endif /* ENABLE_ELUNA */
@@ -209,8 +210,7 @@ float Player::GetMeleeCritFromAgility()
         return 0.0f;
     }
 
-    float crit = critBase->base + GetStat(STAT_AGILITY) * critRatio->ratio;
-    return crit * 100.0f;
+    return CombatFormulas::CritChancePercentFromStat(critBase->base, GetStat(STAT_AGILITY), critRatio->ratio);
 }
 
 /**
@@ -310,8 +310,7 @@ float Player::GetSpellCritFromIntellect()
         return 0.0f;
     }
 
-    float crit = critBase->base + GetStat(STAT_INTELLECT) * critRatio->ratio;
-    return crit * 100.0f;
+    return CombatFormulas::CritChancePercentFromStat(critBase->base, GetStat(STAT_INTELLECT), critRatio->ratio);
 }
 
 float Player::GetRatingMultiplier(CombatRating cr) const

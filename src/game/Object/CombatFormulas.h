@@ -88,6 +88,16 @@ namespace CombatFormulas
     {
         return baseDamage + baseDamage / 2;
     }
+
+    /// Crit chance (percent) derived from a primary stat: (base + statValue *
+    /// ratioPerStat) * 100. `base` and `ratioPerStat` are the class/level
+    /// coefficients from the Cata GameTables (gtChanceTo{Spell,Melee}Crit{Base}),
+    /// authoritative in the 15595 client extract. Used for melee-crit-from-agility
+    /// and spell-crit-from-intellect.
+    inline float CritChancePercentFromStat(float base, float statValue, float ratioPerStat)
+    {
+        return (base + statValue * ratioPerStat) * 100.0f;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H

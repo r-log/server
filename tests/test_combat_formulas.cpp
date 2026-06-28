@@ -80,3 +80,34 @@ TEST_CASE("combat: crushing blow damage (150%)")
     CHECK(ApplyCrushingDamage(3)   == 4u);    // 3 + 3/2
     CHECK(ApplyCrushingDamage(0)   == 0u);
 }
+
+TEST_CASE("combat: crit chance percent from stat (formula)")
+{
+    // crit% = (base + statValue * ratioPerStat) * 100
+    CHECK(CritChancePercentFromStat(0.0f,  0.0f,    0.0f)    == doctest::Approx(0.0f));
+    CHECK(CritChancePercentFromStat(0.05f, 0.0f,    0.0001f) == doctest::Approx(5.0f));   // base only
+    CHECK(CritChancePercentFromStat(0.05f, 1000.0f, 0.0001f) == doctest::Approx(15.0f));  // 0.05 + 0.10
+}
+
+TEST_CASE("combat: crit-from-stat grounded in our 15595 GameTables")
+{
+    // Authoritative coefficients read from our own client extract
+    // (server_install/dbc). Layout: base = gt*CritBase row (class-1);
+    // ratio = gt*Crit row ((class-1)*GT_MAX_LEVEL + level-1), value column = "xf".
+
+    // Mage (class 8) spell crit @ level 85:
+    //   gtChanceToSpellCritBase.dbc row7  = 0.00907500
+    //   gtChanceToSpellCrit.dbc     row784 = 1.54105e-05  (per intellect)
+    const float mageBase  = 0.009075f;
+    const float mageRatio = 1.54105e-05f;
+    CHECK(CritChancePercentFromStat(mageBase, 0.0f,    mageRatio) == doctest::Approx(0.9075f));
+    CHECK(CritChancePercentFromStat(mageBase, 1000.0f, mageRatio) == doctest::Approx(2.44855f));
+
+    // Rogue (class 4) melee crit @ level 85 (note negative base):
+    //   gtChanceToMeleeCritBase.dbc row3   = -0.00295000
+    //   gtChanceToMeleeCrit.dbc     row384 = 3.07957e-05  (per agility)
+    const float rogueBase  = -0.00295f;
+    const float rogueRatio = 3.07957e-05f;
+    CHECK(CritChancePercentFromStat(rogueBase, 0.0f,    rogueRatio) == doctest::Approx(-0.295f));
+    CHECK(CritChancePercentFromStat(rogueBase, 1000.0f, rogueRatio) == doctest::Approx(2.78457f));
+}
