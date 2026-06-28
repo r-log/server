@@ -98,6 +98,16 @@ namespace CombatFormulas
     {
         return (base + statValue * ratioPerStat) * 100.0f;
     }
+
+    /// Combat-rating-to-percent multiplier (percent gained per 1 point of a
+    /// combat rating): classScalar / ratingPerPercent. `classScalar` comes from
+    /// gtOCTClassCombatRatingScalar and `ratingPerPercent` (rating points needed
+    /// for 1% at the unit's level) from gtCombatRatings -- both authoritative in
+    /// the 15595 client extract. Caller guards null GameTable entries.
+    inline float CombatRatingMultiplier(float classScalar, float ratingPerPercent)
+    {
+        return classScalar / ratingPerPercent;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H

@@ -111,3 +111,25 @@ TEST_CASE("combat: crit-from-stat grounded in our 15595 GameTables")
     CHECK(CritChancePercentFromStat(rogueBase, 0.0f,    rogueRatio) == doctest::Approx(-0.295f));
     CHECK(CritChancePercentFromStat(rogueBase, 1000.0f, rogueRatio) == doctest::Approx(2.78457f));
 }
+
+TEST_CASE("combat: combat-rating to percent multiplier (formula)")
+{
+    // multiplier (% per 1 rating point) = classScalar / ratingPerPercent
+    CHECK(CombatRatingMultiplier(1.0f, 100.0f) == doctest::Approx(0.01f));
+    CHECK(CombatRatingMultiplier(0.5f, 100.0f) == doctest::Approx(0.005f));
+}
+
+TEST_CASE("combat: rating multiplier grounded in our 15595 GameTables")
+{
+    // gtCombatRatings.dbc row 884 = CR_CRIT_MELEE(8)*GT_MAX_LEVEL(100) + (85-1):
+    //   ratingPerPercent = 179.28004  (our 15595 extract; the canonical "179.28
+    //   crit rating = 1% crit at level 85").
+    // gtOCTClassCombatRatingScalar.dbc: class scalar for crit = 1.0 (e.g. Warrior
+    //   row (0*32 + 8 + 1)=9, Mage row 233).
+    const float critRatingPerPct = 179.28004f;
+    const float critScalar       = 1.0f;
+
+    CHECK(CombatRatingMultiplier(critScalar, critRatingPerPct) == doctest::Approx(0.0055779f));
+    // 179.28 crit rating yields exactly 1% crit at level 85:
+    CHECK(critRatingPerPct * CombatRatingMultiplier(critScalar, critRatingPerPct) == doctest::Approx(1.0f));
+}
