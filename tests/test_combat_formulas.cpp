@@ -61,6 +61,31 @@ TEST_CASE("combat: melee miss skill reduction")
     CHECK(MeleeMissSkillReduction(-5, false)  == doctest::Approx(-0.5f)); // NPC, -5 skill: miss 5.5%
 }
 
+TEST_CASE("combat: melee miss vs level matches the 4.3.4 client table")
+{
+    // Ground the PvE melee-miss result against the 15595 client
+    // (PaperDollFrame.lua BASE_MISS_CHANCE_PHYSICAL = {5.0, 5.5, 6.0, 8.0}):
+    // a player attacking a target `offset` levels higher misses at those
+    // percentages for +0/+1/+2/+3. The +3 (raid boss) 8% is why the Cata melee
+    // "hit cap" for special attacks is 8% (web-confirmed). Weapon skill is
+    // deprecated in 4.0.1, so max skill is level*5 and the skill diff fed to the
+    // reduction is -5 per level the target is above. Algebraically identical to
+    // TrinityCore 4.3.4 Unit::GetMeleeMissChance.
+    auto pveMiss = [](int levelOffset)
+    {
+        return 5.0f - MeleeMissSkillReduction(-5 * levelOffset, false);
+    };
+    CHECK(pveMiss(0) == doctest::Approx(5.0f));   // same level
+    CHECK(pveMiss(1) == doctest::Approx(5.5f));   // +1
+    CHECK(pveMiss(2) == doctest::Approx(6.0f));   // +2
+    CHECK(pveMiss(3) == doctest::Approx(8.0f));   // +3 raid boss (8% hit cap)
+
+    // White-hit dual wield adds a flat +19% miss (client DUAL_WIELD_HIT_PENALTY,
+    // Blizzard-confirmed; auto-attacks only). Unit::MeleeMissChanceCalc adds this
+    // on top of the level-based base, so a dual-wielder vs a +3 boss sees 27%.
+    CHECK(pveMiss(3) + 19.0f == doctest::Approx(27.0f));
+}
+
 TEST_CASE("combat: glancing damage multiplier")
 {
     // Cata 4.0.1 flat model: 10% reduction per level the victim is above the
