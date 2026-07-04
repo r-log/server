@@ -89,6 +89,17 @@ namespace CombatFormulas
         return baseDamage + baseDamage / 2;
     }
 
+    /// Critical-hit damage: 200% of normal (double), matching the integer form
+    /// used in melee combat (base + base). Physical melee/ranged crit is a flat
+    /// +100% bonus in 4.3.4, unchanged since vanilla (the spell-crit base-bonus
+    /// change to 100% was patch 5.0.4/MoP, which does not apply here). Aura
+    /// crit-damage modifiers (MOD_CRIT_DAMAGE_BONUS,
+    /// MOD_ATTACKER_MELEE_CRIT_DAMAGE) are state-dependent and stay in Unit::.
+    inline uint32 ApplyCriticalDamage(uint32 baseDamage)
+    {
+        return baseDamage + baseDamage;
+    }
+
     /// Crit chance (percent) derived from a primary stat: (base + statValue *
     /// ratioPerStat) * 100. `base` and `ratioPerStat` are the class/level
     /// coefficients from the Cata GameTables (gtChanceTo{Spell,Melee}Crit{Base}),

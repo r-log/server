@@ -106,6 +106,18 @@ TEST_CASE("combat: crushing blow damage (150%)")
     CHECK(ApplyCrushingDamage(0)   == 0u);
 }
 
+TEST_CASE("combat: critical hit damage (200%)")
+{
+    // Physical melee/ranged crit doubles damage in 4.3.4 (flat +100% bonus,
+    // unchanged since vanilla; matches TrinityCore's `Damage *= 2`). The MoP
+    // 5.0.4 spell-crit change to +100% does not apply. Aura crit-damage
+    // modifiers layer on top in Unit:: and are out of scope here.
+    CHECK(ApplyCriticalDamage(100) == 200u);
+    CHECK(ApplyCriticalDamage(101) == 202u);
+    CHECK(ApplyCriticalDamage(1)   == 2u);
+    CHECK(ApplyCriticalDamage(0)   == 0u);
+}
+
 TEST_CASE("combat: crit chance percent from stat (formula)")
 {
     // crit% = (base + statValue * ratioPerStat) * 100

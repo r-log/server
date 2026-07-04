@@ -186,8 +186,8 @@ void Unit::CalculateMeleeDamage(Unit* pVictim, CalcDamageInfo* damageInfo, Weapo
             damageInfo->TargetState  = VICTIMSTATE_NORMAL;
 
             damageInfo->procEx |= PROC_EX_CRITICAL_HIT;
-            // Crit bonus calc
-            damageInfo->damage += damageInfo->damage;
+            // Crit bonus calc: 200% base (aura crit-damage mods applied below)
+            damageInfo->damage = CombatFormulas::ApplyCriticalDamage(damageInfo->damage);
 
             // Apply SPELL_AURA_MOD_CRIT_DAMAGE_BONUS modifier first
             const int32 bonus = GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_CRIT_DAMAGE_BONUS, SPELL_SCHOOL_MASK_NORMAL);
