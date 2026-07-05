@@ -356,3 +356,15 @@ TEST_CASE("combat: haste sources stack multiplicatively (Cata)")
     // pure functions above; the stateful Player rating code is untouched.
     CHECK(HastenedTime(HastenedTime(3600.0f, 10.0f), 10.0f) == doctest::Approx(3600.0f / 1.21f));
 }
+
+TEST_CASE("combat: creature AP-delta damage bonus (operand-order normalization)")
+{
+    // Creature::UpdateDamagePhysical converts only the AP DELTA vs the DB
+    // MeleeAttackPower base to bonus damage (the DB damage range already
+    // includes the template's base AP); rewired to the shared helper --
+    // the legacy (delta * speed) / 14 order agrees with (delta / 14) * speed
+    // within float rounding.
+    CHECK(MeleeAttackPowerDamageBonus(280.0f, 2.0f) == doctest::Approx((280.0f * 2.0f) / 14.0f));   // exact: 40 bonus damage per swing
+    CHECK(MeleeAttackPowerDamageBonus(-140.0f, 2.0f) == doctest::Approx(-20.0f));   // negative delta (AP debuffed below DB base) keeps its sign
+    CHECK(MeleeAttackPowerDamageBonus(966.3f, 2.6f) == doctest::Approx((966.3f * 2.6f) / 14.0f));   // non-exact operands: both orders agree within epsilon
+}

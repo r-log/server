@@ -1078,7 +1078,8 @@ void Creature::UpdateDamagePhysical(WeaponAttackType attType)
 
     /* difference in AP between current attack power and base value from DB */
     float att_pwr_change = GetTotalAttackPowerValue(attType) - GetCreatureInfo()->MeleeAttackPower;
-    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + (att_pwr_change * GetAPMultiplier(attType, false) / 14.0f);
+    // (delta / 14) * speed via the shared helper; legacy (delta * speed) / 14 differs only by float rounding (<= 1 ulp)
+    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + CombatFormulas::MeleeAttackPowerDamageBonus(att_pwr_change, GetAPMultiplier(attType, false));
     float base_pct    = GetModifierValue(unitMod, BASE_PCT);
     float total_value = GetModifierValue(unitMod, TOTAL_VALUE);
     float total_pct   = GetModifierValue(unitMod, TOTAL_PCT);
