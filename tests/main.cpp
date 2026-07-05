@@ -30,3 +30,15 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
+
+#include "Database/DatabaseEnv.h"
+
+// Process-level globals normally defined by the mangosd executable
+// (src/mangosd/mangosd.cpp): linking engine translation units that
+// reference them requires definitions here too. They stay unconnected
+// and uninitialized -- tests must not touch the database.
+DatabaseType WorldDatabase;                                 ///< Accessor to the world database
+DatabaseType CharacterDatabase;                             ///< Accessor to the character database
+DatabaseType LoginDatabase;                                 ///< Accessor to the realm/login database
+
+uint32 realmID = 0;                                         ///< Id of the realm

@@ -79,9 +79,9 @@
  * @param ap_benefit additional melee attackpower benefit from auras
  * @param damagetype what kind of damage
  * @param donePart calculate for done or taken
- * @param defCoeffMod default coefficient for additional scaling (i.e. normal player healing SCALE_SPELLPOWER_HEALING)
+ * @param healing true when called from the healing bonus path (selects heal effects/auras for the DBC coefficient)
  */
-int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int32 benefit, int32 ap_benefit,  DamageEffectType damagetype, bool donePart, float defCoeffMod)
+int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int32 benefit, int32 ap_benefit,  DamageEffectType damagetype, bool donePart, bool healing)
 {
     // Distribute Damage over multiple effects, reduce by AoE
     float coeff = 1.0f;
@@ -91,7 +91,9 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
     {
         coeff = 1.0f;
     }
-    // Check for table values
+    // Check for table values - kept as an operator override over the DBC-driven
+    // default below; also the only source of ap_bonus/ap_dot_bonus (the DBC
+    // carries none)
     else if (SpellBonusEntry const* bonus = sSpellMgr.GetSpellBonusData(spellProto->Id))
     {
         coeff = damagetype == DOT ? bonus->dot_damage : bonus->direct_damage;
@@ -113,16 +115,14 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
             total += int32(ap_bonus * (GetTotalAttackPowerValue(IsSpellRequiresRangedAP(spellProto) ? RANGED_ATTACK : BASE_ATTACK) + ap_benefit));
         }
     }
-    // Default calculation
+    // Default: 4.3.4 data-driven per-effect DBC coefficient x spell scaling (TC 4.3.4 parity)
     else if (benefit)
     {
-        coeff = CalculateDefaultCoefficient(spellProto, damagetype) * defCoeffMod;
+        coeff = CalculateSpellBonusCoefficient(spellProto, damagetype, healing, getLevel());
     }
 
     if (benefit)
     {
-        float LvlPenalty = CalculateLevelPenalty(spellProto);
-
         // Spellmod SpellDamage
         if (Player* modOwner = GetSpellModOwner())
         {
@@ -131,7 +131,7 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
             coeff /= 100.0f;
         }
 
-        total += int32(CombatFormulas::SpellPowerDamageBonus(benefit, coeff) * LvlPenalty);
+        total += int32(CombatFormulas::SpellPowerDamageBonus(benefit, coeff));
     }
 
     return total;
@@ -1249,7 +1249,7 @@ uint32 Unit::SpellHealingBonusDone(Unit* pVictim, SpellEntry const* spellProto, 
     int32 DoneAdvertisedBenefit  = SpellBaseHealingBonusDone(GetSpellSchoolMask(spellProto));
 
     // apply ap bonus and benefit affected by spell power implicit coeffs and spell level penalties
-    DoneTotal = SpellBonusWithCoeffs(spellProto, DoneTotal, DoneAdvertisedBenefit, 0, damagetype, true, SCALE_SPELLPOWER_HEALING);
+    DoneTotal = SpellBonusWithCoeffs(spellProto, DoneTotal, DoneAdvertisedBenefit, 0, damagetype, true, true);
 
     // use float as more appropriate for negative values and percent applying
     float heal = (healamount + DoneTotal * int32(stack)) * DoneTotalMod;
@@ -1299,7 +1299,7 @@ uint32 Unit::SpellHealingBonusTaken(Unit* pCaster, SpellEntry const* spellProto,
     int32 TakenAdvertisedBenefit = SpellBaseHealingBonusTaken(GetSpellSchoolMask(spellProto));
 
     // apply benefit affected by spell power implicit coeffs and spell level penalties
-    TakenTotal = pCaster->SpellBonusWithCoeffs(spellProto, TakenTotal, TakenAdvertisedBenefit, 0, damagetype, false, SCALE_SPELLPOWER_HEALING);
+    TakenTotal = pCaster->SpellBonusWithCoeffs(spellProto, TakenTotal, TakenAdvertisedBenefit, 0, damagetype, false, true);
 
     AuraList const& mHealingGet = GetAurasByType(SPELL_AURA_MOD_HEALING_RECEIVED);
     for (AuraList::const_iterator i = mHealingGet.begin(); i != mHealingGet.end(); ++i)

@@ -505,6 +505,129 @@ float CalculateDefaultCoefficient(SpellEntry const* spellProto, DamageEffectType
 }
 
 /**
+ * @brief Calculates the 15595 SpellScaling.dbc multiplier for a caster level.
+ *
+ * @param scaling The spell's scaling entry, or NULL for no scaling row.
+ * @param level The caster's level.
+ * @return The scaling multiplier; 1.0 at/above the row's max scaling level.
+ */
+float CalculateSpellScalingMultiplier(SpellScalingEntry const* scaling, uint32 level)
+{
+    if (!scaling || level == 0)
+    {
+        return 1.0f;
+    }
+
+    float multiplier = 1.0f;
+    float scalingMultiplier = 1.0f;
+
+    if (level < scaling->castScalingMaxLevel && scaling->castTimeMax)
+    {
+        int32 castTime = int32(scaling->castTimeMin) +
+                          (int32(level) - 1) * (int32(scaling->castTimeMax) - int32(scaling->castTimeMin)) /
+                          (int32(scaling->castScalingMaxLevel) - 1);
+        multiplier = scalingMultiplier = castTime / static_cast<float>(scaling->castTimeMax);
+    }
+
+    if (level < scaling->coefLevelBase)
+    {
+        scalingMultiplier = ((((1.0f - scaling->coefBase) * (int32(level) - 1)) /
+                             (int32(scaling->coefLevelBase) - 1)) + scaling->coefBase) * multiplier;
+    }
+
+    return scalingMultiplier;
+}
+
+/**
+ * @brief Selects the 15595 SpellEffect.dbc bonus coefficient for a spell.
+ *
+ * Approximates TC's per-effIndex lookup by a damage-type-driven scan,
+ * since m3's bonus path has no effect index; periodic DBC coefficients
+ * are per-tick.
+ *
+ * @param effects The spell's per-index effect entries (may contain NULLs).
+ * @param damagetype The damage effect type being evaluated.
+ * @param healing True to select a healing effect/aura, false for damage.
+ * @return The matching EffectBonusMultiplier, or 0.0f if none matched.
+ */
+float SelectSpellBonusCoefficient(SpellEffectEntry const* const* effects, DamageEffectType damagetype, bool healing)
+{
+    if (damagetype == DOT)
+    {
+        for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+        {
+            SpellEffectEntry const* effect = effects[i];
+            if (!effect)
+            {
+                continue;
+            }
+            if (effect->Effect != SPELL_EFFECT_APPLY_AURA && effect->Effect != SPELL_EFFECT_PERSISTENT_AREA_AURA)
+            {
+                continue;
+            }
+            bool matchesAura = healing ?
+                (effect->EffectApplyAuraName == SPELL_AURA_PERIODIC_HEAL || effect->EffectApplyAuraName == SPELL_AURA_OBS_MOD_HEALTH) :
+                (effect->EffectApplyAuraName == SPELL_AURA_PERIODIC_DAMAGE || effect->EffectApplyAuraName == SPELL_AURA_PERIODIC_LEECH);
+            if (matchesAura)
+            {
+                return effect->EffectBonusMultiplier;
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+        {
+            SpellEffectEntry const* effect = effects[i];
+            if (!effect)
+            {
+                continue;
+            }
+            bool matchesEffect = healing ?
+                (effect->Effect == SPELL_EFFECT_HEAL || effect->Effect == SPELL_EFFECT_HEAL_MECHANICAL) :
+                (effect->Effect == SPELL_EFFECT_SCHOOL_DAMAGE || effect->Effect == SPELL_EFFECT_HEALTH_LEECH || effect->Effect == SPELL_EFFECT_POWER_BURN);
+            if (matchesEffect)
+            {
+                return effect->EffectBonusMultiplier;
+            }
+        }
+    }
+
+    // Scripted/triggered shapes where the damage effect is a dummy: fall
+    // back to the first nonzero coefficient of any non-NULL effect.
+    for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+    {
+        SpellEffectEntry const* effect = effects[i];
+        if (effect && effect->EffectBonusMultiplier != 0.0f)
+        {
+            return effect->EffectBonusMultiplier;
+        }
+    }
+
+    return 0.0f;
+}
+
+/**
+ * @brief Calculates the 4.3.4 data-driven spell power bonus coefficient.
+ *
+ * @param spellProto The spell entry.
+ * @param damagetype The damage effect type being evaluated.
+ * @param healing True to select a healing effect/aura, false for damage.
+ * @param casterLevel The caster's level.
+ * @return The DBC effect coefficient times the spell scaling multiplier.
+ */
+float CalculateSpellBonusCoefficient(SpellEntry const* spellProto, DamageEffectType damagetype, bool healing, uint32 casterLevel)
+{
+    SpellEffectEntry const* effects[MAX_EFFECT_INDEX];
+    for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+    {
+        effects[i] = spellProto->GetSpellEffect(SpellEffectIndex(i));
+    }
+
+    return SelectSpellBonusCoefficient(effects, damagetype, healing) * CalculateSpellScalingMultiplier(spellProto->GetSpellScaling(), casterLevel);
+}
+
+/**
  * @brief Determines which weapon attack type a spell uses.
  *
  * @param spellInfo The spell entry.

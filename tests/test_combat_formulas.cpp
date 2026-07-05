@@ -29,6 +29,8 @@
 
 #include "doctest/doctest.h"
 #include "CombatFormulas.h"
+#include "SpellMgr.h"
+#include "DBCStructure.h"
 
 using namespace CombatFormulas;
 
@@ -433,18 +435,14 @@ TEST_CASE("combat: spell power damage bonus (pure multiply kernel)")
 
 TEST_CASE("combat: spell power bonus coefficient derivation (characterization)")
 {
-    // CHARACTERIZED MISALIGNMENT (flagged, intentionally NOT fixed here):
-    // m3 gets the coefficient from the spell_bonus_data DB table, falling
-    // back to the WotLK-era computed rule castTime/3500 (with DotFactor =
-    // duration/15000/ticks for DoTs) in CalculateDefaultCoefficient, then
-    // applies the vanilla low-level penalty (CalculateLevelPenalty). The
-    // 4.3.4 client data instead ships explicit per-effect coefficients in
-    // SpellEffect.dbc (13,937 nonzero m_effectBonus values in our 15595
-    // extract), which m3 loads but never reads; TC 4.3.4 uses
-    // BonusMultiplier * SpellScalingMultiplier with no 3.5s fallback in
-    // the bonus path. Fixing this ripples across every spell and needs
-    // its own verified pass. Below: the computed fallback's shape for an
-    // instant (GCD-floored 1500ms) cast under the current m3 rule.
+    // FIXED: SpellBonusWithCoeffs now derives the default coefficient from
+    // the 15595 SpellEffect.dbc per-effect coefficient (m_effectBonus) times
+    // the SpellScaling.dbc multiplier (TC 4.3.4 parity); spell_bonus_data DB
+    // rows still override, and CalculateDefaultCoefficient (the retired
+    // WotLK-era cast-time/3500 fallback) survives only for debug/DB-check
+    // tooling. This case now pins the retired fallback's pure shape for
+    // historical reference: what an instant (GCD-floored 1500ms) cast used
+    // to produce under the old rule.
     float instantCoeff = 1500.0f / 3500.0f;
     CHECK(SpellPowerDamageBonus(1000.0f, instantCoeff) == doctest::Approx(428.5714f).epsilon(0.0001));
 
@@ -454,20 +452,21 @@ TEST_CASE("combat: spell power bonus coefficient derivation (characterization)")
 
 TEST_CASE("combat: legacy vs 4.3.4 DBC coefficients for representative spells (characterization)")
 {
-    // SAFETY NET before the coefficient-source switch (spell_bonus_data /
-    // CalculateDefaultCoefficient -> SpellEffect.dbc m_effectBonus). Pins the
-    // CURRENT m3 inputs to SpellPowerDamageBonus for a representative spell
-    // set at level 85 (CalculateLevelPenalty == 1.0 for all of these). Current
-    // sources, in order: (1) the spell_bonus_data DB row when the shipped
-    // getMaNGOS world DB has one (database/World/Setup/FullDB/spell_bonus_data.sql,
-    // 132 rows, WotLK-era values), else (2) CalculateDefaultCoefficient
-    // (direct: castTime/3500; DoT: DotFactor = duration/15000/maxTicks), then
-    // (3) CalculateLevelPenalty (1.0 at 85 for these spells). These WotLK-era
-    // DB numbers differ from the real 15595 SpellEffect.dbc per-effect
-    // coefficients m3 already loads but never reads -- the upcoming switch.
+    // The coefficient-source switch (spell_bonus_data / CalculateDefaultCoefficient
+    // -> SpellEffect.dbc m_effectBonus) has landed in SpellBonusWithCoeffs.
+    // This case now documents two things side by side for a representative
+    // spell set at level 85: (1) what a spell_bonus_data DB override row
+    // still produces when one is shipped (database/World/Setup/FullDB/
+    // spell_bonus_data.sql, 132 rows, WotLK-era values; direct: castTime/3500,
+    // DoT: DotFactor = duration/15000/maxTicks via the retired
+    // CalculateDefaultCoefficient fallback, both formerly followed by
+    // CalculateLevelPenalty == 1.0 at 85 for these spells), and (2) the real
+    // 15595 SpellEffect.dbc per-effect coefficients that are now the default
+    // when no override row exists.
     const float sp = 2000.0f;
 
-    // --- legacy path: what CURRENT m3 feeds the multiply kernel today ---
+    // --- legacy path: what a spell_bonus_data DB override row (or the
+    // retired fallback) used to feed the multiply kernel ---
 
     // Fireball (133): DB row direct_bonus = 1.0.
     CHECK(SpellPowerDamageBonus(sp, 1.0f) == doctest::Approx(2000.0f));
@@ -530,11 +529,142 @@ TEST_CASE("combat: legacy vs 4.3.4 DBC coefficients for representative spells (c
     // below level 80 the rows attenuate (e.g. Fireball coefBase 0.88 to
     // level 80), replacing the vanilla CalculateLevelPenalty entirely.
 
-    // --- divergence: this is the delta the switch campaign is about ---
+    // --- divergence: this is the delta a spell_bonus_data DB override row
+    // still makes versus the DBC-driven default ---
     CHECK(SpellPowerDamageBonus(sp, 1.0f) != doctest::Approx(SpellPowerDamageBonus(sp, 1.236f)));   // Fireball: DB row shadows the DBC value
     CHECK(SpellPowerDamageBonus(sp, 0.714f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.856f)));  // Smite
     CHECK(SpellPowerDamageBonus(sp, 3000.0f / 3500.0f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.754f)));  // Shadow Bolt: fallback shape vs DBC
     CHECK(SpellPowerDamageBonus(sp, 0.2f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.176f)));    // Corruption per-tick
     CHECK(SpellPowerDamageBonus(sp, 0.2f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.220f)));    // Immolate direct
     CHECK(SpellPowerDamageBonus(sp, renewCoeff) != doctest::Approx(SpellPowerDamageBonus(sp, 0.131f)));  // Renew: 1.88 fallback vs DBC heal coeff
+}
+
+TEST_CASE("combat: spell scaling multiplier mirrors TC 4.3.4 (15595 SpellScaling rows)")
+{
+    // No scaling row (e.g. spells outside the scaling system) is a no-op.
+    CHECK(CalculateSpellScalingMultiplier(NULL, 85) == doctest::Approx(1.0f));
+
+    // Fireball (row 18): parsed from server_install/dbc/SpellScaling.dbc.
+    SpellScalingEntry row18 = {};
+    row18.castTimeMin = 1500;
+    row18.castTimeMax = 2500;
+    row18.castScalingMaxLevel = 20;
+    row18.playerClass = 8;
+    row18.coefBase = 0.88f;
+    row18.coefLevelBase = 80;
+
+    CHECK(CalculateSpellScalingMultiplier(&row18, 85) == doctest::Approx(1.0f));
+    CHECK(CalculateSpellScalingMultiplier(&row18, 80) == doctest::Approx(1.0f));
+    CHECK(CalculateSpellScalingMultiplier(&row18, 10) == doctest::Approx(0.705285f));
+    CHECK(CalculateSpellScalingMultiplier(&row18, 5) == doctest::Approx(0.606076f));
+
+    // Immolate (row 291).
+    SpellScalingEntry row291 = {};
+    row291.castTimeMin = 2000;
+    row291.castTimeMax = 2000;
+    row291.castScalingMaxLevel = 20;
+    row291.playerClass = 9;
+    row291.coefBase = 0.55f;
+    row291.coefLevelBase = 80;
+
+    CHECK(CalculateSpellScalingMultiplier(&row291, 85) == doctest::Approx(1.0f));
+    CHECK(CalculateSpellScalingMultiplier(&row291, 40) == doctest::Approx(0.772152f));
+
+    // Renew (row 207): flat cast time, coefLevelBase 0 -> never nerfed.
+    SpellScalingEntry row207 = {};
+    row207.castTimeMin = 0;
+    row207.castTimeMax = 0;
+    row207.castScalingMaxLevel = 20;
+    row207.playerClass = 5;
+    row207.coefBase = 1.0f;
+    row207.coefLevelBase = 0;
+
+    CHECK(CalculateSpellScalingMultiplier(&row207, 85) == doctest::Approx(1.0f));
+    CHECK(CalculateSpellScalingMultiplier(&row207, 1) == doctest::Approx(1.0f));
+
+    // At max level the multiplier is 1.0, so the DBC coefficient applies
+    // unattenuated; below a row's nerf level it replaces the vanilla
+    // CalculateLevelPenalty.
+}
+
+TEST_CASE("combat: DBC bonus-coefficient effect selection (15595 effect shapes)")
+{
+    // Fireball (133): single direct-damage effect.
+    SpellEffectEntry fireballE0 = {};
+    fireballE0.Effect = SPELL_EFFECT_SCHOOL_DAMAGE;
+    fireballE0.EffectBonusMultiplier = 1.236f;
+    SpellEffectEntry const* fireballEffects[MAX_EFFECT_INDEX] = { &fireballE0, NULL, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(fireballEffects, SPELL_DIRECT_DAMAGE, false) == doctest::Approx(1.236f));
+
+    // Corruption (172): periodic damage aura plus an inert dummy effect.
+    SpellEffectEntry corruptionE0 = {};
+    corruptionE0.Effect = SPELL_EFFECT_APPLY_AURA;
+    corruptionE0.EffectApplyAuraName = SPELL_AURA_PERIODIC_DAMAGE;
+    corruptionE0.EffectBonusMultiplier = 0.176f;
+    SpellEffectEntry corruptionE1 = {};
+    corruptionE1.Effect = SPELL_EFFECT_DUMMY;
+    corruptionE1.EffectBonusMultiplier = 0.0f;
+    SpellEffectEntry const* corruptionEffects[MAX_EFFECT_INDEX] = { &corruptionE0, &corruptionE1, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(corruptionEffects, DOT, false) == doctest::Approx(0.176f));
+
+    // Immolate (348): hybrid direct + DoT; a scripted dummy effect precedes
+    // both. The same effect array resolves differently per damage type.
+    SpellEffectEntry immolateE0 = {};
+    immolateE0.Effect = SPELL_EFFECT_SCRIPT_EFFECT;
+    immolateE0.EffectBonusMultiplier = 0.0f;
+    SpellEffectEntry immolateE1 = {};
+    immolateE1.Effect = SPELL_EFFECT_SCHOOL_DAMAGE;
+    immolateE1.EffectBonusMultiplier = 0.220f;
+    SpellEffectEntry immolateE2 = {};
+    immolateE2.Effect = SPELL_EFFECT_APPLY_AURA;
+    immolateE2.EffectApplyAuraName = SPELL_AURA_PERIODIC_DAMAGE;
+    immolateE2.EffectBonusMultiplier = 0.176f;
+    SpellEffectEntry const* immolateEffects[MAX_EFFECT_INDEX] = { &immolateE0, &immolateE1, &immolateE2 };
+
+    CHECK(SelectSpellBonusCoefficient(immolateEffects, SPELL_DIRECT_DAMAGE, false) == doctest::Approx(0.220f));
+    CHECK(SelectSpellBonusCoefficient(immolateEffects, DOT, false) == doctest::Approx(0.176f));
+
+    // Renew (139): periodic heal aura.
+    SpellEffectEntry renewE0 = {};
+    renewE0.Effect = SPELL_EFFECT_APPLY_AURA;
+    renewE0.EffectApplyAuraName = SPELL_AURA_PERIODIC_HEAL;
+    renewE0.EffectBonusMultiplier = 0.131f;
+    SpellEffectEntry const* renewEffects[MAX_EFFECT_INDEX] = { &renewE0, NULL, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(renewEffects, DOT, true) == doctest::Approx(0.131f));
+
+    // Flash Heal (2061): direct heal effect.
+    SpellEffectEntry flashHealE0 = {};
+    flashHealE0.Effect = SPELL_EFFECT_HEAL;
+    flashHealE0.EffectBonusMultiplier = 0.725f;
+    SpellEffectEntry const* flashHealEffects[MAX_EFFECT_INDEX] = { &flashHealE0, NULL, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(flashHealEffects, SPELL_DIRECT_DAMAGE, true) == doctest::Approx(0.725f));
+
+    // No matching effect/aura and no nonzero fallback -> 0.0f.
+    SpellEffectEntry zeroEffect = {};
+    SpellEffectEntry const* zeroEffects[MAX_EFFECT_INDEX] = { &zeroEffect, NULL, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(zeroEffects, SPELL_DIRECT_DAMAGE, false) == doctest::Approx(0.0f));
+
+    // All-NULL effect array -> 0.0f.
+    SpellEffectEntry const* nullEffects[MAX_EFFECT_INDEX] = { NULL, NULL, NULL };
+
+    CHECK(SelectSpellBonusCoefficient(nullEffects, SPELL_DIRECT_DAMAGE, false) == doctest::Approx(0.0f));
+
+    // End-to-end proof: DBC effect coefficient x spell scaling multiplier
+    // feeding the multiply kernel, 2000 spell power at level 85.
+    SpellScalingEntry row18 = {};
+    row18.castTimeMin = 1500;
+    row18.castTimeMax = 2500;
+    row18.castScalingMaxLevel = 20;
+    row18.coefBase = 0.88f;
+    row18.coefLevelBase = 80;
+
+    CHECK(SpellPowerDamageBonus(2000.0f, SelectSpellBonusCoefficient(fireballEffects, SPELL_DIRECT_DAMAGE, false) * CalculateSpellScalingMultiplier(&row18, 85))
+          == doctest::Approx(2472.0f));
+    CHECK(SpellPowerDamageBonus(2000.0f, SelectSpellBonusCoefficient(corruptionEffects, DOT, false) * 1.0f)
+          == doctest::Approx(352.0f));
 }

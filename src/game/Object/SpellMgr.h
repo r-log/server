@@ -102,6 +102,36 @@ uint32 GetSpellCastTimeForBonus(SpellEntry const* spellProto, DamageEffectType d
  */
 float CalculateDefaultCoefficient(SpellEntry const* spellProto, DamageEffectType const damagetype);
 
+/**
+ * @brief Calculates the 15595 SpellScaling.dbc multiplier for a caster level.
+ *
+ * @param scaling The spell's scaling entry, or NULL for no scaling row.
+ * @param level The caster's level.
+ * @return The scaling multiplier; 1.0 at/above the row's max scaling level.
+ */
+float CalculateSpellScalingMultiplier(SpellScalingEntry const* scaling, uint32 level);
+
+/**
+ * @brief Selects the 15595 SpellEffect.dbc bonus coefficient for a spell.
+ *
+ * @param effects The spell's per-index effect entries (may contain NULLs).
+ * @param damagetype The damage effect type being evaluated.
+ * @param healing True to select a healing effect/aura, false for damage.
+ * @return The matching EffectBonusMultiplier, or 0.0f if none matched.
+ */
+float SelectSpellBonusCoefficient(SpellEffectEntry const* const* effects, DamageEffectType damagetype, bool healing);
+
+/**
+ * @brief Calculates the 4.3.4 data-driven spell power bonus coefficient.
+ *
+ * @param spellProto The spell entry.
+ * @param damagetype The damage effect type being evaluated.
+ * @param healing True to select a healing effect/aura, false for damage.
+ * @param casterLevel The caster's level.
+ * @return The DBC effect coefficient times the spell scaling multiplier.
+ */
+float CalculateSpellBonusCoefficient(SpellEntry const* spellProto, DamageEffectType damagetype, bool healing, uint32 casterLevel);
+
 inline float GetSpellMinRange(SpellRangeEntry const* range, bool friendly = false)
 {
     if (!range)
