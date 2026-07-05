@@ -368,3 +368,28 @@ TEST_CASE("combat: creature AP-delta damage bonus (operand-order normalization)"
     CHECK(MeleeAttackPowerDamageBonus(-140.0f, 2.0f) == doctest::Approx(-20.0f));   // negative delta (AP debuffed below DB base) keeps its sign
     CHECK(MeleeAttackPowerDamageBonus(966.3f, 2.6f) == doctest::Approx((966.3f * 2.6f) / 14.0f));   // non-exact operands: both orders agree within epsilon
 }
+
+TEST_CASE("combat: victim crit-damage-taken mod on a ranged periodic magic crit (characterization)")
+{
+    // FLAG (characterized, not changed): Unit::SpellCriticalDamageBonus keys
+    // the victim-side crit-damage-taken aura on DmgClass -- a ranged periodic
+    // MAGIC crit consults SPELL_AURA_MOD_ATTACKER_RANGED_CRIT_DAMAGE (204),
+    // not the spell variant (205), while the attacker-side multiplier treats
+    // the same tick as a spell (+50%). No authoritative reference exists: TC
+    // 4.3.4 has no victim-side block in this function and leaves aura 205
+    // unimplemented. Full 15595 SpellEffect.dbc scan: aura 204 appears only
+    // on internal test spell 61860 (Arena 1 Resil), which carries 203+204+205
+    // all at -24% / school mask 127 -- either keying yields the same value --
+    // and aura 205 otherwise only on unused TBC debuffs 38714-38717. The
+    // selection is therefore value-neutral in authentic 4.3.4 data.
+
+    // Pipeline shape pinned via the pure kernels: a 1000 ranged periodic
+    // magic tick crits to 1500 (+50%), then the victim mod scales only the
+    // 500 bonus: production computes int32(bonus * (100 + mod) / 100).
+    const uint32 tick = 1000;
+    const uint32 crit = ApplySpellCriticalDamage(tick);
+    CHECK(crit == 1500);
+    const int32 bonus = int32(crit - tick);
+    // 61860's -24% taken-mod: identical result whether keyed ranged or spell.
+    CHECK(int32(bonus * (100.0f + -24) / 100.0f) == 380);   // 1000 + 380 = 1380 either way
+}

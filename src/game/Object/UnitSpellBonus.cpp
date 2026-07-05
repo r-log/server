@@ -1037,6 +1037,12 @@ uint32 Unit::SpellCriticalDamageBonus(SpellEntry const* spellProto, uint32 damag
         return damage += crit_bonus;
     }
 
+    // Victim-side crit-damage-taken selection keys on DmgClass, so a ranged
+    // periodic magic crit consults MOD_ATTACKER_RANGED_CRIT_DAMAGE while the
+    // attacker-side bonus above treats it as a spell. Server-specific legacy:
+    // TC 4.3.4 has no victim block here and never consumes aura 205. 15595
+    // data: 203/204 only on test spell 61860 (all three effects, equal value),
+    // 205 also on unused TBC debuffs 38714-38717 -- keying is value-neutral.
     int32 critPctDamageMod = 0;
     if (spellProto->GetDmgClass() >= SPELL_DAMAGE_CLASS_MELEE)
     {
