@@ -85,6 +85,7 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
 {
     // Distribute Damage over multiple effects, reduce by AoE
     float coeff = 1.0f;
+    char const* coeffSource = "DBC";
 
     // Not apply this to creature casted spells
     if (GetTypeId() == TYPEID_UNIT && !((Creature*)this)->IsPet())
@@ -97,11 +98,13 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
     else if (SpellBonusEntry const* bonus = sSpellMgr.GetSpellBonusData(spellProto->Id))
     {
         coeff = damagetype == DOT ? bonus->dot_damage : bonus->direct_damage;
+        coeffSource = "spell_bonus_data";
 
         // negative = no SP override in the row (kept for AP part); use the DBC coefficient
         if (coeff < 0.0f)
         {
             coeff = CalculateSpellBonusCoefficient(spellProto, damagetype, healing, getLevel());
+            coeffSource = "DBC";
         }
 
         // apply ap bonus at done part calculation only (it flat total mod so common with taken)
@@ -125,6 +128,7 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
     else if (benefit)
     {
         coeff = CalculateSpellBonusCoefficient(spellProto, damagetype, healing, getLevel());
+        coeffSource = "DBC";
     }
 
     if (benefit)
@@ -137,7 +141,14 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
             coeff /= 100.0f;
         }
 
-        total += int32(CombatFormulas::SpellPowerDamageBonus(benefit, coeff));
+        int32 bonusFromSP = int32(CombatFormulas::SpellPowerDamageBonus(benefit, coeff));
+        total += bonusFromSP;
+
+        if (donePart && !healing && GetTypeId() == TYPEID_PLAYER && sWorld.getConfig(CONFIG_BOOL_DEBUG_SPELL_COEFF))
+        {
+            char const* spellName = (spellProto->SpellName && spellProto->SpellName[sWorld.GetDefaultDbcLocale()]) ? spellProto->SpellName[sWorld.GetDefaultDbcLocale()] : "";
+            sLog.outString("SpellCoeff: %u \"%s\" coeff=%.3f [%s] SP=%d bonus=%d", spellProto->Id, spellName, coeff, coeffSource, benefit, bonusFromSP);
+        }
     }
 
     return total;

@@ -630,6 +630,8 @@ void World::LoadConfigSettings(bool reload)
     setConfigMinMax(CONFIG_UINT32_CINEMATIC_FLYOVER_TIMEOUT_SEC, "CinematicFlyover.TimeoutSec", 120, 1, 600);
     setConfig(CONFIG_UINT32_CINEMATIC_FLYOVER_BODY_ENTRY, "CinematicFlyover.BodyEntry", 12999);
 
+    setConfig(CONFIG_BOOL_DEBUG_SPELL_COEFF, "Debug.SpellCoeff", false);
+
     ///- Load the CharDelete related config options
     setConfigMinMax(CONFIG_UINT32_CHARDELETE_METHOD, "CharDelete.Method", 0, 0, 1);
     setConfigMinMax(CONFIG_UINT32_CHARDELETE_MIN_LEVEL, "CharDelete.MinLevel", 0, 0, getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL));
