@@ -994,17 +994,28 @@ bool Unit::IsSpellCrit(Unit* pVictim, SpellEntry const* spellProto, SpellSchoolM
  * @param spellProto The spell entry.
  * @param damage The base damage.
  * @param pVictim The victim, if any.
+ * @param periodicDamage True when called for a periodic (DoT) tick.
  * @return The damage after critical bonuses.
  */
-uint32 Unit::SpellCriticalDamageBonus(SpellEntry const* spellProto, uint32 damage, Unit* pVictim)
+uint32 Unit::SpellCriticalDamageBonus(SpellEntry const* spellProto, uint32 damage, Unit* pVictim, bool periodicDamage)
 {
     // Calculate critical bonus
     int32 crit_bonus;
     switch(spellProto->GetDmgClass())
     {
         case SPELL_DAMAGE_CLASS_MELEE:                      // for melee based spells is 100%
-        case SPELL_DAMAGE_CLASS_RANGED:
             crit_bonus = int32(CombatFormulas::ApplyCriticalDamage(damage) - damage);
+            break;
+        case SPELL_DAMAGE_CLASS_RANGED:
+            // Ranged periodic magic (Serpent Sting, Black Arrow) crits +50% like spells
+            if (periodicDamage && (GetSpellSchoolMask(spellProto) & SPELL_SCHOOL_MASK_MAGIC) != 0)
+            {
+                crit_bonus = int32(CombatFormulas::ApplySpellCriticalDamage(damage) - damage);
+            }
+            else
+            {
+                crit_bonus = int32(CombatFormulas::ApplyCriticalDamage(damage) - damage);
+            }
             break;
         default:                                            // for spells is 50%
             crit_bonus = int32(CombatFormulas::ApplySpellCriticalDamage(damage) - damage);

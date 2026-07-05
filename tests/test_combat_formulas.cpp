@@ -167,6 +167,19 @@ TEST_CASE("combat: spell critical damage (150%)")
     CHECK(ApplySpellCriticalDamage(0)   == 0u);
 }
 
+TEST_CASE("combat: ranged periodic magic crits use the spell multiplier (150%)")
+{
+    // 4.3.4: ranged-damage-class spells whose periodic damage is a magic
+    // school (Serpent Sting = Nature, Black Arrow = Shadow) crit for +50%
+    // like spells, not +100% like physical ranged attacks.
+    // Unit::SpellCriticalDamageBonus selects ApplySpellCriticalDamage for
+    // periodic ticks of magic-school ranged spells.
+    CHECK(ApplySpellCriticalDamage(1000u) == 1500u);
+    CHECK(ApplyCriticalDamage(1000u) == 2000u);
+    // A Serpent Sting tick that crits must take the 1500 path, not 2000.
+    CHECK(ApplySpellCriticalDamage(1000u) != ApplyCriticalDamage(1000u));
+}
+
 TEST_CASE("combat: spell critical healing (200%)")
 {
     // Healing crits double in 4.3.4: raised from 150% to 200% in patch
