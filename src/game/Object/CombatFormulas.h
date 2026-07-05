@@ -71,6 +71,22 @@ namespace CombatFormulas
             return skillDiff * 0.1f;
     }
 
+    /// Base spell hit chance (whole percent) from `leveldif` =
+    /// victimLevel - casterLevel. Spell sibling of the melee hit-table
+    /// formulas: miss = 100 - hit reproduces the 4.3.4 client's
+    /// BASE_MISS_CHANCE_SPELL = {4.0, 5.0, 6.0, 17.0} for PvE offsets
+    /// +0..+3 (hit 96/95/94/83). Beyond +2 each extra level adds 11% miss
+    /// vs creatures and 7% vs players. Spell mods, victim auras, mechanic
+    /// resistance and hit rating stay in Unit::MagicSpellHitResult.
+    inline int32 SpellHitChanceBase(int32 leveldif, bool victimIsPlayer)
+    {
+        if (leveldif < 3)
+            return 96 - leveldif;
+
+        int32 lchance = victimIsPlayer ? 7 : 11;
+        return 94 - (leveldif - 2) * lchance;
+    }
+
     /// Glancing-blow damage multiplier (Cata 4.0.1): flat 10% reduction per level
     /// the victim is above the attacker, capped at 3 levels (raid boss = 0.70,
     /// i.e. -30%). The pre-4.0.1 weapon-skill random window is gone. Only used

@@ -848,20 +848,11 @@ SpellMissInfo Unit::MagicSpellHitResult(Unit* pVictim, SpellEntry const* spell)
     }
 
     SpellSchoolMask schoolMask = GetSpellSchoolMask(spell);
-    // PvP - PvE spell misschances per leveldif > 2
-    int32 lchance = pVictim->GetTypeId() == TYPEID_PLAYER ? 7 : 11;
     int32 leveldif = int32(pVictim->GetLevelForTarget(this)) - int32(GetLevelForTarget(pVictim));
 
-    // Base hit chance from attacker and victim levels
-    int32 modHitChance;
-    if (leveldif < 3)
-    {
-        modHitChance = 96 - leveldif;
-    }
-    else
-    {
-        modHitChance = 94 - (leveldif - 2) * lchance;
-    }
+    // Base hit chance from attacker and victim levels (PvP - PvE spell
+    // misschances per leveldif > 2 live in CombatFormulas)
+    int32 modHitChance = CombatFormulas::SpellHitChanceBase(leveldif, pVictim->GetTypeId() == TYPEID_PLAYER);
 
     // Spellmod from SPELLMOD_RESIST_MISS_CHANCE
     if (Player* modOwner = GetSpellModOwner())

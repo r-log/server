@@ -86,6 +86,39 @@ TEST_CASE("combat: melee miss vs level matches the 4.3.4 client table")
     CHECK(pveMiss(3) + 19.0f == doctest::Approx(27.0f));
 }
 
+TEST_CASE("combat: spell miss vs level matches the 4.3.4 client table")
+{
+    // Ground the PvE spell-miss result against the 15595 client
+    // (PaperDollFrame.lua BASE_MISS_CHANCE_SPELL = {4.0, 5.0, 6.0, 17.0}):
+    // miss = 100 - SpellHitChanceBase for +0/+1/+2/+3. The +3 (raid boss)
+    // 17% is the well-known Cata spell "hit cap" (period-confirmed,
+    // 2010-2011 sources). Ranged uses BASE_MISS_CHANCE_PHYSICAL and is
+    // covered by the melee miss-vs-level case above. Algebraically
+    // identical to TrinityCore 4.3.4 for PvE.
+    auto pveMiss = [](int levelOffset)
+    {
+        return 100 - SpellHitChanceBase(levelOffset, false);
+    };
+    CHECK(pveMiss(0) == 4);    // same level
+    CHECK(pveMiss(1) == 5);    // +1
+    CHECK(pveMiss(2) == 6);    // +2
+    CHECK(pveMiss(3) == 17);   // +3 raid boss (17% spell hit cap)
+    CHECK(pveMiss(4) == 28);   // beyond boss: +11%/level vs creatures
+
+    // vs players the slope beyond +2 is 7%/level: +3 player = 13% miss.
+    // Characterizes current behaviour; TC 4.3.4 instead uses a separate
+    // PvP base (94 - 3*offset -> 6/9/12/15) -- divergence flagged for
+    // review, not fixed here.
+    CHECK(100 - SpellHitChanceBase(0, true) == 4);
+    CHECK(100 - SpellHitChanceBase(3, true) == 13);
+
+    // Lower-level targets: miss shrinks 1%/level below the caster
+    // (characterizes current behaviour; the client paperdoll table only
+    // shows offsets 0..3).
+    CHECK(100 - SpellHitChanceBase(-1, false) == 3);
+    CHECK(100 - SpellHitChanceBase(-2, false) == 2);
+}
+
 TEST_CASE("combat: glancing damage multiplier")
 {
     // Cata 4.0.1 flat model: 10% reduction per level the victim is above the
