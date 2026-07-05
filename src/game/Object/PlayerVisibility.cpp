@@ -81,6 +81,39 @@
 
 #include <cmath>
 
+/// MouseTrace: logs a spellclick-flagged creature becoming visible to a player
+static void MouseTraceLogSpellClickVisible(Player* player, WorldObject* target)
+{
+    if (!sWorld.getConfig(CONFIG_BOOL_DEBUG_MOUSE_TRACE))
+    {
+        return;
+    }
+
+    if (target->GetTypeId() != TYPEID_UNIT)
+    {
+        return;
+    }
+
+    Unit* unit = (Unit*)target;
+    if (!unit->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK))
+    {
+        return;
+    }
+
+    float tx = target->GetPositionX();
+    float ty = target->GetPositionY();
+    float tz = target->GetPositionZ();
+    float dx = tx - player->GetPositionX();
+    float dy = ty - player->GetPositionY();
+    float dz = tz - player->GetPositionZ();
+    float dist = sqrtf(dx * dx + dy * dy + dz * dz);
+    float zGround = target->GetTerrain()->GetHeightStatic(tx, ty, tz);
+    float zLiquid = target->GetTerrain()->GetWaterLevel(tx, ty, tz);
+
+    sLog.outString("MouseTrace SPELLCLICK-VISIBLE: %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f zGround=%.1f zLiquid=%.1f",
+                    target->GetGuidStr().c_str(), target->GetName(), tx, ty, tz, dist, zGround, zLiquid);
+}
+
 /**
  * @brief Checks whether this player should be visible to another player in grid range.
  *
@@ -221,6 +254,7 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* targe
         if (target->IsVisibleForInState(this, viewPoint, false))
         {
             target->SendCreateUpdateToPlayer(this);
+            MouseTraceLogSpellClickVisible(this, target);
             if (target->GetTypeId() != TYPEID_GAMEOBJECT || !((GameObject*)target)->IsTransport())
             {
                 m_clientGUIDs.insert(target->GetObjectGuid());
@@ -276,6 +310,7 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, T* target, UpdateD
         {
             visibleNow.insert(target);
             target->BuildCreateUpdateBlockForPlayer(&data, this);
+            MouseTraceLogSpellClickVisible(this, target);
             UpdateVisibilityOf_helper(m_clientGUIDs, target);
 
             DEBUG_FILTER_LOG(LOG_FILTER_VISIBILITY_CHANGES, "UpdateVisibilityOf(TemplateV): %s is visible now for %s. Distance = %f", target->GetGuidStr().c_str(), GetGuidStr().c_str(), GetDistance(target));

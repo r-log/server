@@ -631,6 +631,7 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_UINT32_CINEMATIC_FLYOVER_BODY_ENTRY, "CinematicFlyover.BodyEntry", 12999);
 
     setConfig(CONFIG_BOOL_DEBUG_SPELL_COEFF, "Debug.SpellCoeff", false);
+    setConfig(CONFIG_BOOL_DEBUG_MOUSE_TRACE, "Debug.MouseTrace", false);
 
     ///- Load the CharDelete related config options
     setConfigMinMax(CONFIG_UINT32_CHARDELETE_METHOD, "CharDelete.Method", 0, 0, 1);

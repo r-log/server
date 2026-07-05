@@ -50,6 +50,7 @@
 #include "ScriptMgr.h"
 #include "Totem.h"
 #include "SpellAuras.h"
+#include "World.h"
 
 /**
  * @brief Handles use-item requests and casts the item's use spell.
@@ -762,9 +763,32 @@ void WorldSession::HandleSpellClick(WorldPacket& recv_data)
     }
 
     Creature* unit = _player->GetMap()->GetAnyTypeCreature(guid);
-    if (!unit || unit->IsInCombat())                        // client prevent click and set different icon at combat state
+    if (!unit)
+    {
+        if (sWorld.getConfig(CONFIG_BOOL_DEBUG_MOUSE_TRACE))
+        {
+            sLog.outString("MouseTrace SPELLCLICK-MISS: player %s (%.1f,%.1f,%.1f) -> guid %s not on map",
+                            _player->GetName(), _player->GetPositionX(), _player->GetPositionY(), _player->GetPositionZ(), guid.GetString().c_str());
+        }
+
+        return;
+    }
+
+    if (unit->IsInCombat())                                 // client prevent click and set different icon at combat state
     {
         return;
+    }
+
+    if (sWorld.getConfig(CONFIG_BOOL_DEBUG_MOUSE_TRACE))
+    {
+        float dx = unit->GetPositionX() - _player->GetPositionX();
+        float dy = unit->GetPositionY() - _player->GetPositionY();
+        float dz = unit->GetPositionZ() - _player->GetPositionZ();
+        float dist = sqrtf(dx * dx + dy * dy + dz * dz);
+
+        sLog.outString("MouseTrace SPELLCLICK: player %s (%.1f,%.1f,%.1f) -> %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f",
+                        _player->GetName(), _player->GetPositionX(), _player->GetPositionY(), _player->GetPositionZ(),
+                        unit->GetGuidStr().c_str(), unit->GetName(), unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), dist);
     }
 
     SpellClickInfoMapBounds clickPair = sObjectMgr.GetSpellClickInfoMapBounds(unit->GetEntry());
