@@ -110,8 +110,11 @@ static void MouseTraceLogSpellClickVisible(Player* player, WorldObject* target)
     float zGround = target->GetTerrain()->GetHeightStatic(tx, ty, tz);
     float zLiquid = target->GetTerrain()->GetWaterLevel(tx, ty, tz);
 
-    sLog.outString("MouseTrace SPELLCLICK-VISIBLE: %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f zGround=%.1f zLiquid=%.1f",
-                    target->GetGuidStr().c_str(), target->GetName(), tx, ty, tz, dist, zGround, zLiquid);
+    sLog.outString("MouseTrace SPELLCLICK-VISIBLE: %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f zGround=%.1f zLiquid=%.1f bR=%.3f cR=%.3f scale=%.2f",
+                    target->GetGuidStr().c_str(), target->GetName(), tx, ty, tz, dist, zGround, zLiquid,
+                    unit->GetFloatValue(UNIT_FIELD_BOUNDINGRADIUS),
+                    unit->GetFloatValue(UNIT_FIELD_COMBATREACH),
+                    unit->GetObjectScale());
 }
 
 /**

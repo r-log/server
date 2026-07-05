@@ -584,13 +584,17 @@ void WorldSession::HandleSetSelectionOpcode(WorldPacket& recv_data)
         float dz = unit->GetPositionZ() - _player->GetPositionZ();
         float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-        sLog.outString("MouseTrace SELECT: player %s (%.1f,%.1f,%.1f) -> %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f npcflags=0x%X spellclick=%d moving=%d alive=%d",
+        sLog.outString("MouseTrace SELECT: player %s (%.1f,%.1f,%.1f) -> %s \"%s\" at (%.1f,%.1f,%.1f) dist=%.1f npcflags=0x%X spellclick=%d moving=%d alive=%d bR=%.3f cR=%.3f scale=%.2f uflags=0x%X",
                         _player->GetName(), _player->GetPositionX(), _player->GetPositionY(), _player->GetPositionZ(),
                         unit->GetGuidStr().c_str(), unit->GetName(), unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), dist,
                         unit->GetUInt32Value(UNIT_NPC_FLAGS),
                         unit->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK) ? 1 : 0,
                         unit->hasUnitState(UNIT_STAT_MOVING) ? 1 : 0,
-                        unit->IsAlive() ? 1 : 0);
+                        unit->IsAlive() ? 1 : 0,
+                        unit->GetFloatValue(UNIT_FIELD_BOUNDINGRADIUS),
+                        unit->GetFloatValue(UNIT_FIELD_COMBATREACH),
+                        unit->GetObjectScale(),
+                        unit->GetUInt32Value(UNIT_FIELD_FLAGS));
     }
 
     if (FactionTemplateEntry const* factionTemplateEntry = sFactionTemplateStore.LookupEntry(unit->getFaction()))
