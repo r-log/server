@@ -451,3 +451,90 @@ TEST_CASE("combat: spell power bonus coefficient derivation (characterization)")
     // Production form truncates: int32(benefit * coeff * LvlPenalty).
     CHECK(int32(SpellPowerDamageBonus(1000.0f, instantCoeff) * 1.0f) == 428);
 }
+
+TEST_CASE("combat: legacy vs 4.3.4 DBC coefficients for representative spells (characterization)")
+{
+    // SAFETY NET before the coefficient-source switch (spell_bonus_data /
+    // CalculateDefaultCoefficient -> SpellEffect.dbc m_effectBonus). Pins the
+    // CURRENT m3 inputs to SpellPowerDamageBonus for a representative spell
+    // set at level 85 (CalculateLevelPenalty == 1.0 for all of these). Current
+    // sources, in order: (1) the spell_bonus_data DB row when the shipped
+    // getMaNGOS world DB has one (database/World/Setup/FullDB/spell_bonus_data.sql,
+    // 132 rows, WotLK-era values), else (2) CalculateDefaultCoefficient
+    // (direct: castTime/3500; DoT: DotFactor = duration/15000/maxTicks), then
+    // (3) CalculateLevelPenalty (1.0 at 85 for these spells). These WotLK-era
+    // DB numbers differ from the real 15595 SpellEffect.dbc per-effect
+    // coefficients m3 already loads but never reads -- the upcoming switch.
+    const float sp = 2000.0f;
+
+    // --- legacy path: what CURRENT m3 feeds the multiply kernel today ---
+
+    // Fireball (133): DB row direct_bonus = 1.0.
+    CHECK(SpellPowerDamageBonus(sp, 1.0f) == doctest::Approx(2000.0f));
+
+    // Smite (585): DB row direct_bonus = 0.714.
+    CHECK(SpellPowerDamageBonus(sp, 0.714f) == doctest::Approx(1428.0f));
+
+    // Corruption (172): DB row dot_bonus = 0.2 per tick. Same shape as the
+    // computed fallback: duration 18000ms / 15000 / 6 ticks = 0.2.
+    CHECK(SpellPowerDamageBonus(sp, 0.2f) == doctest::Approx(400.0f));
+
+    // Immolate (348): DB row direct 0.2 / dot 0.2 per tick.
+    CHECK(SpellPowerDamageBonus(sp, 0.2f) == doctest::Approx(400.0f));  // direct
+    CHECK(SpellPowerDamageBonus(sp, 0.2f) == doctest::Approx(400.0f));  // per tick
+
+    // Shadow Bolt (686): NO row in the shipped spell_bonus_data dump ->
+    // computed fallback castTimeForBonus/3500 with its 3.0s base cast.
+    CHECK(SpellPowerDamageBonus(sp, 3000.0f / 3500.0f) == doctest::Approx(1714.2857f));
+
+    // Renew (139): no row in the shipped dump either; fallback path with the
+    // 1.88 SCALE_SPELLPOWER_HEALING factor applies. Renew is an instant
+    // (1500ms) HoT, duration 12000ms, 4 ticks -> DotFactor = 12000/15000/4 =
+    // 0.2, so per-tick coeff = 1500/3500 * 0.2 * 1.88.
+    const float renewCoeff = (1500.0f / 3500.0f) * 0.2f * 1.88f;
+    CHECK(SpellPowerDamageBonus(sp, renewCoeff)
+          == doctest::Approx(2000.0f * (1500.0f / 3500.0f) * 0.2f * 1.88f));
+
+    // --- 4.3.4 DBC path: what the 15595 SpellEffect.dbc actually ships ---
+    // (server_install/dbc/SpellEffect.dbc, WDBC, field 6 = m_effectBonus,
+    // 13,937 nonzero records in our extract). This is the target of the
+    // upcoming coefficient-source switch.
+
+    // Fireball eff0 SCHOOL_DAMAGE 1.236.
+    CHECK(SpellPowerDamageBonus(sp, 1.236f) == doctest::Approx(2472.0f));
+
+    // Smite eff0 SCHOOL_DAMAGE 0.856.
+    CHECK(SpellPowerDamageBonus(sp, 0.856f) == doctest::Approx(1712.0f));
+
+    // Shadow Bolt eff0 SCHOOL_DAMAGE 0.754.
+    CHECK(SpellPowerDamageBonus(sp, 0.754f) == doctest::Approx(1508.0f));
+
+    // Corruption eff0 APPLY_AURA/PERIODIC_DAMAGE 0.176 per tick.
+    CHECK(SpellPowerDamageBonus(sp, 0.176f) == doctest::Approx(352.0f));
+
+    // Immolate eff1 SCHOOL_DAMAGE 0.220 direct AND eff2 APPLY_AURA/
+    // PERIODIC_DAMAGE 0.176 per tick.
+    CHECK(SpellPowerDamageBonus(sp, 0.220f) == doctest::Approx(440.0f));  // direct
+    CHECK(SpellPowerDamageBonus(sp, 0.176f) == doctest::Approx(352.0f)); // per tick
+
+    // Renew eff0 APPLY_AURA/PERIODIC_HEAL 0.131 per tick.
+    CHECK(SpellPowerDamageBonus(sp, 0.131f) == doctest::Approx(262.0f));
+
+    // Flash Heal (2061) eff0 HEAL 0.725.
+    CHECK(SpellPowerDamageBonus(sp, 0.725f) == doctest::Approx(1450.0f));
+
+    // SpellScaling.dbc rows for all of these evaluate to multiplier 1.0 at
+    // level 85 (Fireball row 18, Smite 211, Shadow Bolt 306, Corruption 271,
+    // Immolate 291, Renew 207, Flash Heal 189; parsed from our
+    // server_install/dbc/SpellScaling.dbc), so it is a no-op here -- but
+    // below level 80 the rows attenuate (e.g. Fireball coefBase 0.88 to
+    // level 80), replacing the vanilla CalculateLevelPenalty entirely.
+
+    // --- divergence: this is the delta the switch campaign is about ---
+    CHECK(SpellPowerDamageBonus(sp, 1.0f) != doctest::Approx(SpellPowerDamageBonus(sp, 1.236f)));   // Fireball: DB row shadows the DBC value
+    CHECK(SpellPowerDamageBonus(sp, 0.714f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.856f)));  // Smite
+    CHECK(SpellPowerDamageBonus(sp, 3000.0f / 3500.0f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.754f)));  // Shadow Bolt: fallback shape vs DBC
+    CHECK(SpellPowerDamageBonus(sp, 0.2f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.176f)));    // Corruption per-tick
+    CHECK(SpellPowerDamageBonus(sp, 0.2f) != doctest::Approx(SpellPowerDamageBonus(sp, 0.220f)));    // Immolate direct
+    CHECK(SpellPowerDamageBonus(sp, renewCoeff) != doctest::Approx(SpellPowerDamageBonus(sp, 0.131f)));  // Renew: 1.88 fallback vs DBC heal coeff
+}
