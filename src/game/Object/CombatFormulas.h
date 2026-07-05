@@ -116,6 +116,28 @@ namespace CombatFormulas
         return baseDamage + baseDamage;
     }
 
+    /// Spell critical damage: 150% of normal, matching the integer form used
+    /// in spell combat (base + base / 2). Magic spell crits are a +50% bonus
+    /// in 4.3.4; the change to +100% was patch 5.0.4/MoP, which does not
+    /// apply here. Melee/ranged damage-class spells double instead (see
+    /// ApplyCriticalDamage). Aura crit-damage modifiers
+    /// (MOD_CRIT_DAMAGE_BONUS, MOD_ATTACKER_SPELL_CRIT_DAMAGE) and spell
+    /// mods are state-dependent and stay in Unit::SpellCriticalDamageBonus.
+    inline uint32 ApplySpellCriticalDamage(uint32 baseDamage)
+    {
+        return baseDamage + baseDamage / 2;
+    }
+
+    /// Spell critical healing: 200% of normal (double), matching the integer
+    /// form used in Unit::SpellCriticalHealingBonus (base + base). Healing
+    /// crits were raised from 150% to 200% in patch 4.2.0 (2011-06-28), so
+    /// 4.3.4 doubles. MOD_CRITICAL_HEALING_AMOUNT auras layer on top in
+    /// Unit:: and are out of scope here.
+    inline uint32 ApplySpellCriticalHealing(uint32 baseHeal)
+    {
+        return baseHeal + baseHeal;
+    }
+
     /// Crit chance (percent) derived from a primary stat: (base + statValue *
     /// ratioPerStat) * 100. `base` and `ratioPerStat` are the class/level
     /// coefficients from the Cata GameTables (gtChanceTo{Spell,Melee}Crit{Base}),

@@ -58,6 +58,7 @@
 #include "movement/MoveSpline.h"
 #include "CreatureLinkingMgr.h"
 #include "GameTime.h"
+#include "CombatFormulas.h"
 // NOTE: movement/MovementStructures.h intentionally NOT included here - it defines
 // the MovementStatusElements sequence arrays at file scope (one-TU-only), owned by Unit.cpp.
 #ifdef ENABLE_ELUNA
@@ -1003,10 +1004,10 @@ uint32 Unit::SpellCriticalDamageBonus(SpellEntry const* spellProto, uint32 damag
     {
         case SPELL_DAMAGE_CLASS_MELEE:                      // for melee based spells is 100%
         case SPELL_DAMAGE_CLASS_RANGED:
-            crit_bonus = damage;
+            crit_bonus = int32(CombatFormulas::ApplyCriticalDamage(damage) - damage);
             break;
-        default:
-            crit_bonus = damage / 2;                        // for spells is 50%
+        default:                                            // for spells is 50%
+            crit_bonus = int32(CombatFormulas::ApplySpellCriticalDamage(damage) - damage);
             break;
     }
 
@@ -1065,13 +1066,8 @@ uint32 Unit::SpellCriticalDamageBonus(SpellEntry const* spellProto, uint32 damag
  */
 uint32 Unit::SpellCriticalHealingBonus(SpellEntry const* spellProto, uint32 damage, Unit* pVictim)
 {
-    // Calculate critical bonus
-    int32 crit_bonus = damage;
-
-    if (crit_bonus > 0)
-    {
-        damage += crit_bonus;
-    }
+    // Calculate critical bonus: 200% of normal since patch 4.2.0
+    damage = CombatFormulas::ApplySpellCriticalHealing(damage);
 
     damage = int32(damage * GetTotalAuraMultiplier(SPELL_AURA_MOD_CRITICAL_HEALING_AMOUNT));
 

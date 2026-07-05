@@ -151,6 +151,35 @@ TEST_CASE("combat: critical hit damage (200%)")
     CHECK(ApplyCriticalDamage(0)   == 0u);
 }
 
+TEST_CASE("combat: spell critical damage (150%)")
+{
+    // Magic spell crits deal 150% in 4.3.4 (+50% bonus), integer form
+    // base + base / 2 -- matches TrinityCore 4.3.4's "Magic spells will
+    // simply deal 50% additional crit damage" (crit_bonus += damage / 2)
+    // and the pre-MoP wikis ("spell critical strikes deal 150% normal
+    // damage without talents"). The change to +100% was patch 5.0.4/MoP,
+    // after 4.3.4. Melee/ranged damage-class spells instead use the
+    // physical x2 (ApplyCriticalDamage). Aura/spell-mod layers stay in
+    // Unit::SpellCriticalDamageBonus.
+    CHECK(ApplySpellCriticalDamage(100) == 150u);
+    CHECK(ApplySpellCriticalDamage(101) == 151u);  // integer: 101 + 101/2
+    CHECK(ApplySpellCriticalDamage(3)   == 4u);    // 3 + 3/2
+    CHECK(ApplySpellCriticalDamage(0)   == 0u);
+}
+
+TEST_CASE("combat: spell critical healing (200%)")
+{
+    // Healing crits double in 4.3.4: raised from 150% to 200% in patch
+    // 4.2.0 (2011-06-28) -- Wowpedia patch note quoted verbatim in
+    // TrinityCore 4.3.4's Unit::SpellCriticalHealingBonus (damage *= 2).
+    // So in 4.3.4 a heal crit is x2 while a spell-damage crit is x1.5.
+    // MOD_CRITICAL_HEALING_AMOUNT auras layer on top in Unit::.
+    CHECK(ApplySpellCriticalHealing(100) == 200u);
+    CHECK(ApplySpellCriticalHealing(101) == 202u);
+    CHECK(ApplySpellCriticalHealing(1)   == 2u);
+    CHECK(ApplySpellCriticalHealing(0)   == 0u);
+}
+
 TEST_CASE("combat: crit chance percent from stat (formula)")
 {
     // crit% = (base + statValue * ratioPerStat) * 100
