@@ -98,6 +98,12 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
     {
         coeff = damagetype == DOT ? bonus->dot_damage : bonus->direct_damage;
 
+        // negative = no SP override in the row (kept for AP part); use the DBC coefficient
+        if (coeff < 0.0f)
+        {
+            coeff = CalculateSpellBonusCoefficient(spellProto, damagetype, healing, getLevel());
+        }
+
         // apply ap bonus at done part calculation only (it flat total mod so common with taken)
         if (donePart && (bonus->ap_bonus || bonus->ap_dot_bonus))
         {
