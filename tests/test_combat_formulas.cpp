@@ -309,3 +309,50 @@ TEST_CASE("combat: attack power bonus to weapon damage per swing")
     // caller): dagger 1.7.
     CHECK(MeleeAttackPowerDamageBonus(1000.0f, 1.7f) == doctest::Approx(121.428571f));
 }
+
+TEST_CASE("combat: haste time factor / hastened time")
+{
+    // factor = 100 / (100 + hastePct); zero haste is a no-op.
+    CHECK(HasteTimeFactor(0.0f) == doctest::Approx(1.0f));
+    CHECK(HastenedTime(3600.0f, 0.0f) == doctest::Approx(3600.0f));
+
+    CHECK(HasteTimeFactor(30.0f) == doctest::Approx(100.0f / 130.0f));
+
+    // A 3.6 s weapon under 30% haste swings every ~2.769 s.
+    CHECK(HastenedTime(3600.0f, 30.0f) == doctest::Approx(2769.2307f));
+
+    // Equivalence to the canonical published form baseTime / (1 + h/100).
+    CHECK(HastenedTime(2500.0f, 17.5f) == doctest::Approx(2500.0f / (1.0f + 17.5f / 100.0f)));
+
+    // Negative haste is a slow: half speed doubles the time.
+    CHECK(HastenedTime(2000.0f, -50.0f) == doctest::Approx(4000.0f));
+
+    // Production consumption sites both reduce to this per-source form:
+    // SpellMgr.cpp castTime * UNIT_MOD_CAST_SPEED, and Unit.cpp attack
+    // timer GetAttackTime(type) * m_modAttackSpeedPct[type].
+}
+
+TEST_CASE("combat: haste sources stack multiplicatively (Cata)")
+{
+    // Two independent 10% sources compose as factor*factor, not as a
+    // single 20% source -- 2975.2 ms vs 3000 ms.
+    CHECK(HastenedTime(HastenedTime(3600.0f, 10.0f), 10.0f)
+          == doctest::Approx(3600.0f * 100.0f / 110.0f * 100.0f / 110.0f));
+    CHECK(HastenedTime(HastenedTime(3600.0f, 10.0f), 10.0f)
+          != doctest::Approx(HastenedTime(3600.0f, 20.0f)));
+
+    // Realistic stack: a 30% Bloodlust-style buff on top of 12.5% from
+    // rating composes as the product of the two per-source factors.
+    float composed = HasteTimeFactor(30.0f) * HasteTimeFactor(12.5f);
+    CHECK(HastenedTime(HastenedTime(3600.0f, 30.0f), 12.5f) == doctest::Approx(3600.0f * composed));
+
+    // FLAG (known divergence, not fixed here): m3 Player::ApplyRatingMod
+    // (PlayerStats.cpp:391-408) composes each haste-RATING delta
+    // multiplicatively, so two +10%-worth-of-rating items yield 1/1.21
+    // (+21% speed). TC 4.3.4 (Player.cpp:5005-5028) instead re-bases the
+    // whole rating pool additively before converting, yielding 1/1.20
+    // (+20%), matching the Wowpedia rule that haste rating stacks
+    // additively with itself. This characterizes the m3 pipeline via the
+    // pure functions above; the stateful Player rating code is untouched.
+    CHECK(HastenedTime(HastenedTime(3600.0f, 10.0f), 10.0f) == doctest::Approx(3600.0f / 1.21f));
+}

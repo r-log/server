@@ -221,6 +221,32 @@ namespace CombatFormulas
     {
         return attackPower / 14.0f * attackSpeedSeconds;
     }
+
+    /// Per-source haste time factor: 100 / (100 + hastePct). Exact float form
+    /// of the ApplyPercentModFloatVar remove-branch (Util.h) that
+    /// Unit::ApplyAttackTimePercentMod / ApplyCastTimePercentMod call for
+    /// positive haste, so each independent haste source multiplies the
+    /// running attack/cast time factor by this -- sources stack
+    /// multiplicatively in 4.3.4 (TC 4.3.4 and Cata-era references agree).
+    /// A negative hastePct (a slow) yields a factor > 1.
+    inline float HasteTimeFactor(float hastePct)
+    {
+        return 100.0f / (100.0f + hastePct);
+    }
+
+    /// Effective (hastened) time from a base time and a single haste percent:
+    /// baseTime * HasteTimeFactor(hastePct), algebraically baseTime /
+    /// (1 + hastePct/100). Units follow the caller -- m3 stores attack time
+    /// in milliseconds. Stacking a second source is
+    /// HastenedTime(HastenedTime(t, h1), h2); rating->percent conversion is
+    /// CombatRatingMultiplier above. Production keeps the stateful
+    /// apply/remove bookkeeping in Unit::ApplyAttackTimePercentMod /
+    /// ApplyCastTimePercentMod via the shared Util.h helper -- this is the
+    /// extracted pure kernel, not a rewire target.
+    inline float HastenedTime(float baseTime, float hastePct)
+    {
+        return baseTime * HasteTimeFactor(hastePct);
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
