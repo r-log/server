@@ -345,16 +345,33 @@ TEST_CASE("combat: haste sources stack multiplicatively (Cata)")
     // rating composes as the product of the two per-source factors.
     float composed = HasteTimeFactor(30.0f) * HasteTimeFactor(12.5f);
     CHECK(HastenedTime(HastenedTime(3600.0f, 30.0f), 12.5f) == doctest::Approx(3600.0f * composed));
+}
 
-    // FLAG (known divergence, not fixed here): m3 Player::ApplyRatingMod
-    // (PlayerStats.cpp:391-408) composes each haste-RATING delta
-    // multiplicatively, so two +10%-worth-of-rating items yield 1/1.21
-    // (+21% speed). TC 4.3.4 (Player.cpp:5005-5028) instead re-bases the
-    // whole rating pool additively before converting, yielding 1/1.20
-    // (+20%), matching the Wowpedia rule that haste rating stacks
-    // additively with itself. This characterizes the m3 pipeline via the
-    // pure functions above; the stateful Player rating code is untouched.
-    CHECK(HastenedTime(HastenedTime(3600.0f, 10.0f), 10.0f) == doctest::Approx(3600.0f / 1.21f));
+TEST_CASE("combat: haste RATING stacks additively with itself (Cata)")
+{
+    // Player::ApplyRatingMod re-bases the whole haste-rating pool on every
+    // change (remove old total percent, apply new total percent), mirroring
+    // TC 4.3.4, so rating composes additively before the single conversion.
+    // Emulate two item equips each worth +10% haste from rating: the pool
+    // goes 0% -> 10% -> 20% and the timer ends at base / 1.20, NOT the
+    // per-delta multiplicative base / 1.21.
+    float t = 3600.0f;
+    t = t / HasteTimeFactor(0.0f) * HasteTimeFactor(10.0f);   // equip 1: 0 -> 10
+    t = t / HasteTimeFactor(10.0f) * HasteTimeFactor(20.0f);  // equip 2: 10 -> 20
+    CHECK(t == doctest::Approx(3600.0f / 1.20f));
+    CHECK(t != doctest::Approx(3600.0f / 1.21f));
+
+    // Single source: re-base from an empty pool is just the plain factor.
+    CHECK(3600.0f / HasteTimeFactor(0.0f) * HasteTimeFactor(10.0f)
+          == doctest::Approx(HastenedTime(3600.0f, 10.0f)));
+
+    // Zero rating: re-base is a no-op.
+    CHECK(3600.0f / HasteTimeFactor(0.0f) * HasteTimeFactor(0.0f)
+          == doctest::Approx(3600.0f));
+
+    // Unequip symmetry: removing one item re-bases 20 -> 10.
+    t = t / HasteTimeFactor(20.0f) * HasteTimeFactor(10.0f);
+    CHECK(t == doctest::Approx(HastenedTime(3600.0f, 10.0f)));
 }
 
 TEST_CASE("combat: creature AP-delta damage bonus (operand-order normalization)")

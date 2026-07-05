@@ -381,8 +381,13 @@ float Player::OCTRegenMPPerSpirit()
     return regen;
 }
 
+/**
+ * @brief Applies a combat rating change; haste ratings re-base the whole
+ *        rating pool (additive with itself), other ratings defer to UpdateRating.
+ */
 void Player::ApplyRatingMod(CombatRating cr, int32 value, bool apply)
 {
+    int32 const oldRating = m_baseRatingValue[cr];
     m_baseRatingValue[cr] += (apply ? value : -value);
 
     // explicit affected values
@@ -390,21 +395,30 @@ void Player::ApplyRatingMod(CombatRating cr, int32 value, bool apply)
     {
         case CR_HASTE_MELEE:
         {
-            float RatingChange = value * GetRatingMultiplier(cr);
-            ApplyAttackTimePercentMod(BASE_ATTACK, RatingChange, apply);
-            ApplyAttackTimePercentMod(OFF_ATTACK, RatingChange, apply);
+            // Haste rating stacks additively with itself: remove the old
+            // rating-pool total and apply the new one as a single percent mod.
+            float const oldChange = oldRating * GetRatingMultiplier(cr);
+            float const newChange = m_baseRatingValue[cr] * GetRatingMultiplier(cr);
+            ApplyAttackTimePercentMod(BASE_ATTACK, oldChange, false);
+            ApplyAttackTimePercentMod(BASE_ATTACK, newChange, true);
+            ApplyAttackTimePercentMod(OFF_ATTACK, oldChange, false);
+            ApplyAttackTimePercentMod(OFF_ATTACK, newChange, true);
             break;
         }
         case CR_HASTE_RANGED:
         {
-            float RatingChange = value * GetRatingMultiplier(cr);
-            ApplyAttackTimePercentMod(RANGED_ATTACK, RatingChange, apply);
+            float const oldChange = oldRating * GetRatingMultiplier(cr);
+            float const newChange = m_baseRatingValue[cr] * GetRatingMultiplier(cr);
+            ApplyAttackTimePercentMod(RANGED_ATTACK, oldChange, false);
+            ApplyAttackTimePercentMod(RANGED_ATTACK, newChange, true);
             break;
         }
         case CR_HASTE_SPELL:
         {
-            float RatingChange = value * GetRatingMultiplier(cr);
-            ApplyCastTimePercentMod(RatingChange, apply);
+            float const oldChange = oldRating * GetRatingMultiplier(cr);
+            float const newChange = m_baseRatingValue[cr] * GetRatingMultiplier(cr);
+            ApplyCastTimePercentMod(oldChange, false);
+            ApplyCastTimePercentMod(newChange, true);
             break;
         }
         default:

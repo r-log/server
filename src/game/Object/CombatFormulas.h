@@ -225,9 +225,11 @@ namespace CombatFormulas
     /// Per-source haste time factor: 100 / (100 + hastePct). Exact float form
     /// of the ApplyPercentModFloatVar remove-branch (Util.h) that
     /// Unit::ApplyAttackTimePercentMod / ApplyCastTimePercentMod call for
-    /// positive haste, so each independent haste source multiplies the
-    /// running attack/cast time factor by this -- sources stack
-    /// multiplicatively in 4.3.4 (TC 4.3.4 and Cata-era references agree).
+    /// positive haste, so each independent haste PERCENT source multiplies
+    /// the running attack/cast time factor by this -- percent sources stack
+    /// multiplicatively in 4.3.4, while haste RATING is summed into one pool
+    /// and converted once (Player::ApplyRatingMod re-bases; TC 4.3.4 and
+    /// Cata-era references agree).
     /// A negative hastePct (a slow) yields a factor > 1.
     inline float HasteTimeFactor(float hastePct)
     {
