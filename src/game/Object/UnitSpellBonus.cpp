@@ -131,7 +131,7 @@ int32 Unit::SpellBonusWithCoeffs(SpellEntry const* spellProto, int32 total, int3
             coeff /= 100.0f;
         }
 
-        total += int32(benefit * coeff * LvlPenalty);
+        total += int32(CombatFormulas::SpellPowerDamageBonus(benefit, coeff) * LvlPenalty);
     }
 
     return total;

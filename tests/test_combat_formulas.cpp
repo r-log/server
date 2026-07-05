@@ -410,3 +410,44 @@ TEST_CASE("combat: victim crit-damage-taken mod on a ranged periodic magic crit 
     // 61860's -24% taken-mod: identical result whether keyed ranged or spell.
     CHECK(int32(bonus * (100.0f + -24) / 100.0f) == 380);   // 1000 + 380 = 1380 either way
 }
+
+TEST_CASE("combat: spell power damage bonus (pure multiply kernel)")
+{
+    // Exact float multiply from Unit::SpellBonusWithCoeffs; level penalty
+    // and int32 truncation stay with the caller.
+    CHECK(SpellPowerDamageBonus(2000.0f, 0.5f) == doctest::Approx(1000.0f));
+    CHECK(SpellPowerDamageBonus(0.0f, 1.0f) == doctest::Approx(0.0f));
+    CHECK(SpellPowerDamageBonus(2000.0f, 0.0f) == doctest::Approx(0.0f));
+
+    // Grounded in the real 15595 SpellEffect.dbc per-effect coefficients
+    // (m_effectBonus): Fireball 1.236, Shadow Bolt 0.754, Smite 0.856.
+    CHECK(SpellPowerDamageBonus(2000.0f, 1.236f) == doctest::Approx(2472.0f));
+    CHECK(SpellPowerDamageBonus(2000.0f, 0.754f) == doctest::Approx(1508.0f));
+    CHECK(SpellPowerDamageBonus(2000.0f, 0.856f) == doctest::Approx(1712.0f));
+
+    // DoT per-tick: the coefficient fed in is per-tick (Corruption 0.176
+    // per tick in the 15595 DBC; m3's computed fallback divides the full
+    // coefficient by the tick count to get the same shape).
+    CHECK(SpellPowerDamageBonus(2000.0f, 0.176f) == doctest::Approx(352.0f));
+}
+
+TEST_CASE("combat: spell power bonus coefficient derivation (characterization)")
+{
+    // CHARACTERIZED MISALIGNMENT (flagged, intentionally NOT fixed here):
+    // m3 gets the coefficient from the spell_bonus_data DB table, falling
+    // back to the WotLK-era computed rule castTime/3500 (with DotFactor =
+    // duration/15000/ticks for DoTs) in CalculateDefaultCoefficient, then
+    // applies the vanilla low-level penalty (CalculateLevelPenalty). The
+    // 4.3.4 client data instead ships explicit per-effect coefficients in
+    // SpellEffect.dbc (13,937 nonzero m_effectBonus values in our 15595
+    // extract), which m3 loads but never reads; TC 4.3.4 uses
+    // BonusMultiplier * SpellScalingMultiplier with no 3.5s fallback in
+    // the bonus path. Fixing this ripples across every spell and needs
+    // its own verified pass. Below: the computed fallback's shape for an
+    // instant (GCD-floored 1500ms) cast under the current m3 rule.
+    float instantCoeff = 1500.0f / 3500.0f;
+    CHECK(SpellPowerDamageBonus(1000.0f, instantCoeff) == doctest::Approx(428.5714f).epsilon(0.0001));
+
+    // Production form truncates: int32(benefit * coeff * LvlPenalty).
+    CHECK(int32(SpellPowerDamageBonus(1000.0f, instantCoeff) * 1.0f) == 428);
+}

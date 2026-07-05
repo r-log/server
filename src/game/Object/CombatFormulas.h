@@ -249,6 +249,22 @@ namespace CombatFormulas
     {
         return baseTime * HasteTimeFactor(hastePct);
     }
+
+    /// Flat spell-power contribution to a spell's damage or healing:
+    /// spellPower * coefficient, the exact float multiply from
+    /// Unit::SpellBonusWithCoeffs (the caller then applies the level
+    /// penalty and truncates to int32). NOTE (characterized, not fixed):
+    /// m3 derives `coefficient` from the spell_bonus_data DB table with a
+    /// WotLK-era cast-time/3.5s computed fallback (CalculateDefaultCoefficient),
+    /// while 4.3.4 is data-driven -- the 15595 SpellEffect.dbc carries an
+    /// explicit per-effect coefficient (m_effectBonus, loaded into
+    /// SpellEffectEntry::EffectBonusMultiplier but currently unused; TC 4.3.4
+    /// multiplies it by the spell scaling multiplier instead of a level
+    /// penalty). For periodic effects the DBC value is already per-tick.
+    inline float SpellPowerDamageBonus(float spellPower, float coefficient)
+    {
+        return spellPower * coefficient;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
