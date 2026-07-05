@@ -290,3 +290,22 @@ TEST_CASE("combat: enemy dodge/parry level bonus")
     CHECK(EnemyDodgeLevelBonus(-2) == doctest::Approx(-1.0f));
     CHECK(EnemyParryLevelBonus(-2) == doctest::Approx(-1.0f));
 }
+
+TEST_CASE("combat: attack power bonus to weapon damage per swing")
+{
+    // Weapon Damage = (Weapon DPS + AP/14) * Weapon Speed; the AP term is
+    // attackPower / 14 * speedSeconds (14 AP = 1 DPS; client 15595
+    // PaperDollFrame.lua ATTACK_POWER_MAGIC_NUMBER = 14).
+    CHECK(MeleeAttackPowerDamageBonus(1400.0f, 3.6f) == doctest::Approx(360.0f));
+    CHECK(MeleeAttackPowerDamageBonus(28.0f, 1.0f)   == doctest::Approx(2.0f)); // 28 AP = 2 DPS
+    CHECK(MeleeAttackPowerDamageBonus(0.0f, 2.4f)    == doctest::Approx(0.0f));
+
+    // m3 feeds speed in seconds derived from GetAttackTime() milliseconds
+    // (GetAPMultiplier, non-normalized: GetAttackTime(attType) / 1000.0f):
+    // a 2600 ms weapon at 966 AP gains 69 DPS * 2.6 s = +179.4 per swing.
+    CHECK(MeleeAttackPowerDamageBonus(966.0f, 2600.0f / 1000.0f) == doctest::Approx(179.4f));
+
+    // Normalized speed (ability AP scaling; speed selection stays in the
+    // caller): dagger 1.7.
+    CHECK(MeleeAttackPowerDamageBonus(1000.0f, 1.7f) == doctest::Approx(121.428571f));
+}

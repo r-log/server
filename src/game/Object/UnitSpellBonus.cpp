@@ -1832,7 +1832,7 @@ uint32 Unit::MeleeDamageBonusDone(Unit* pVictim, uint32 pdamage, WeaponAttackTyp
     else if (APbonus || DoneFlat)
     {
         bool normalized = spellProto ? IsSpellHaveEffect(spellProto, SPELL_EFFECT_NORMALIZED_WEAPON_DMG) : false;
-        DoneTotal += int32(APbonus / 14.0f * GetAPMultiplier(attType, normalized));
+        DoneTotal += int32(CombatFormulas::MeleeAttackPowerDamageBonus(APbonus, GetAPMultiplier(attType, normalized)));
 
         // for weapon damage based spells we still have to apply damage done percent mods
         // (that are already included into pdamage) to not-yet included DoneFlat

@@ -30,6 +30,7 @@
 #include "SharedDefines.h"
 #include "SpellAuras.h"
 #include "SpellMgr.h"
+#include "CombatFormulas.h"
 
 /*#######################################
 ########                         ########
@@ -464,7 +465,7 @@ void Player::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, fl
 
     float att_speed = GetAPMultiplier(attType, normalized);
 
-    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + GetTotalAttackPowerValue(attType) / 14.0f * att_speed;
+    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + CombatFormulas::MeleeAttackPowerDamageBonus(GetTotalAttackPowerValue(attType), att_speed);
     float base_pct    = GetModifierValue(unitMod, BASE_PCT);
     float total_value = GetModifierValue(unitMod, TOTAL_VALUE);
     float total_pct   = GetModifierValue(unitMod, TOTAL_PCT);
@@ -1353,7 +1354,7 @@ void Pet::UpdateDamagePhysical(WeaponAttackType attType)
 
     float att_speed = float(GetAttackTime(BASE_ATTACK)) / 1000.0f;
 
-    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + GetTotalAttackPowerValue(attType) / 14.0f * att_speed;
+    float base_value  = GetModifierValue(unitMod, BASE_VALUE) + CombatFormulas::MeleeAttackPowerDamageBonus(GetTotalAttackPowerValue(attType), att_speed);
     float base_pct    = GetModifierValue(unitMod, BASE_PCT);
     float total_value = GetModifierValue(unitMod, TOTAL_VALUE);
     float total_pct   = GetModifierValue(unitMod, TOTAL_PCT);

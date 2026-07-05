@@ -209,6 +209,18 @@ namespace CombatFormulas
             return 9.0f;
         return levelOffset * 0.5f;
     }
+
+    /// Bonus weapon damage per swing from attack power:
+    /// attackPower / 14 * attackSpeedSeconds. 14 AP = 1 DPS, version-invariant
+    /// vanilla -> Cata (15595 client PaperDollFrame.lua
+    /// ATTACK_POWER_MAGIC_NUMBER = 14). The caller selects the speed (real
+    /// weapon speed for white swings, normalized speed for some abilities --
+    /// both via GetAPMultiplier) and keeps the weapon min/max roll and
+    /// school/aura bonuses in Unit::/Player::.
+    inline float MeleeAttackPowerDamageBonus(float attackPower, float attackSpeedSeconds)
+    {
+        return attackPower / 14.0f * attackSpeedSeconds;
+    }
 }
 
 #endif // MANGOS_COMBATFORMULAS_H
