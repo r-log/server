@@ -81,6 +81,7 @@ class Unit;
 
 #define MAX_GROUP_SIZE 5
 #define MAX_RAID_SIZE 40
+#define MAX_RAID_MARKERS 5                                  ///< NUM_WORLD_RAID_MARKERS in FrameXML
 #define MAX_RAID_SUBGROUPS (MAX_RAID_SIZE / MAX_GROUP_SIZE)
 #define TARGET_ICON_COUNT 8
 
@@ -154,6 +155,8 @@ enum GroupType
     // 0x04?
     GROUPTYPE_LFD    = 0x08,
     // 0x10, leave/change group?, I saw this flag when leaving group and after leaving BG while in group
+    GROUPTYPE_ONE_PERSON_PARTY   = 0x20,                   ///< client: Lua_IsOnePersonParty
+    GROUPTYPE_EVERYONE_ASSISTANT = 0x40,                   ///< client: Lua_IsEveryoneAssistant
 };
 
 enum GroupFlagMask
@@ -284,6 +287,8 @@ class Group
             uint8       group;
             /* Indicates whether the player is assistant. */
             bool        assistant;
+            /* LFG role mask the player picked (tank/healer/damage). */
+            uint8       roles = 0;
             uint32      lastMap;
         };
         typedef std::list<MemberSlot> MemberSlotList;
@@ -302,7 +307,7 @@ class Group
         // group manipulation methods
         bool   Create(ObjectGuid guid, const char* name);
         bool   LoadGroupFromDB(Field* fields);
-        bool   LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant);
+        bool   LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant, uint8 roles = 0);
         bool   AddInvite(Player* player);
         uint32 RemoveInvite(Player* player);
         void   RemoveAllInvites();
@@ -337,12 +342,15 @@ class Group
         ObjectGuid GetObjectGuid() const { return ObjectGuid(HIGHGUID_GROUP, GetId()); }
         bool IsFull() const
         {
-            return (m_groupType == GROUPTYPE_NORMAL) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE);
+            // m_groupType doubles as the client's PartyFlags, so test bits -- an
+            // equality check breaks the moment any other flag (BG, LFD, everyone-
+            // assistant) is OR-ed in.
+            return isRaidGroup() ? (m_memberSlots.size() >= MAX_RAID_SIZE) : (m_memberSlots.size() >= MAX_GROUP_SIZE);
         }
         GroupType GetGroupType() const { return m_groupType; }
         bool isRaidGroup() const
         {
-            return m_groupType == GROUPTYPE_RAID;
+            return (m_groupType & GROUPTYPE_RAID) != 0;
         }
         bool isBGGroup()   const
         {
@@ -432,6 +440,23 @@ class Group
 
         // some additional raid methods
         void ConvertToRaid();
+        void ConvertToParty();                              ///< raid -> party, collapses every member into subgroup 0
+
+        void SetEveryoneIsAssistant(bool apply);            ///< PartyFlags bit 0x40; Lua_IsEveryoneAssistant
+        bool IsEveryoneAssistant() const { return (m_groupType & GROUPTYPE_EVERYONE_ASSISTANT) != 0; }
+
+        void SetLfgRoles(ObjectGuid guid, uint8 roles);     ///< role the client picked; echoed back in SMSG_GROUP_LIST
+        uint8 GetLfgRoles(ObjectGuid guid) const
+        {
+            member_citerator slot = _getMemberCSlot(guid);
+            return slot == m_memberSlots.end() ? 0 : slot->roles;
+        }
+
+        void SendRaidMarkerUpdate();                        ///< which world markers are currently placed
+        uint32 GetGroupMarkerMask() const { return m_markerMask; }
+        void SetRaidMarker(uint8 slot, ObjectGuid caster, uint32 spellId);
+        void ClearRaidMarker(uint8 slot);                   ///< slot >= MAX_RAID_MARKERS clears every marker
+        void ClearMarkersOwnedBy(ObjectGuid caster);        ///< markers die with their caster; forget the slots too
 
         void SetBattlegroundGroup(BattleGround* bg)
         {
@@ -652,5 +677,8 @@ class Group
         Rolls               RollId;
         BoundInstancesMap   m_boundInstances[MAX_DIFFICULTY];
         uint8*              m_subGroupsCounts;
+        uint32              m_markerMask;                   ///< bitmask of placed raid world markers
+        ObjectGuid          m_markerCaster[MAX_RAID_MARKERS]; ///< who dropped each marker
+        uint32              m_markerSpell[MAX_RAID_MARKERS];  ///< and with which spell, so it can be removed
 };
 #endif

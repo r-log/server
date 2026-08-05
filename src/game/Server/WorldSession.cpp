@@ -730,6 +730,9 @@ void WorldSession::LogoutPlayer(bool Save)
         ///- Send update to group
         if (_player->GetGroup())
         {
+            // the marker objects hang off this player and die with him, so drop
+            // the slots too -- otherwise the dropdown keeps showing them placed
+            _player->GetGroup()->ClearMarkersOwnedBy(_player->GetObjectGuid());
             _player->GetGroup()->SendUpdate();
         }
 
