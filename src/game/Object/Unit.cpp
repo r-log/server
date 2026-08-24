@@ -6228,7 +6228,7 @@ void Unit::StopMoving(bool forceSendStop /*=false*/)
 }
 
 /**
- * @brief Interrupts spline movement and updates the unit position immediately.
+ * @brief Interrupts spline movement and commits the in-flight position.
  *
  * @param forceSendStop True to force a stop packet even if already stopped.
  */
@@ -6240,7 +6240,29 @@ void Unit::InterruptMoving(bool forceSendStop /*=false*/)
     {
         Movement::Location loc = movespline->ComputePosition();
         movespline->_Interrupt();
-        Place().MoveTo(loc.x, loc.y, loc.z, loc.orientation);
+
+        if (IsBoarded())
+        {
+            // Boarded spline coordinates are seat-local: update the seat pose
+            Geometry::Placement deckPose;
+            deckPose.EnterFrame(GetTransportInfo()->Seat().CurrentFrame(),
+                                Geometry::Vector3(loc.x, loc.y, loc.z), loc.orientation);
+            GetTransportInfo()->SetSeatPose(deckPose);
+        }
+        else
+        {
+            // A cross-cell write here would desync grid registration; Map
+            // relocation is unsafe from an interrupt (it can unlink the unit
+            // from a cell list a notifier is iterating), so keep the last
+            // committed position and let the next relocation carry it over
+            CellPair const curCell = MaNGOS::ComputeCellPair(Where().X(), Where().Y());
+            CellPair const newCell = MaNGOS::ComputeCellPair(loc.x, loc.y);
+            if (curCell == newCell)
+            {
+                Place().MoveTo(loc.x, loc.y, loc.z, loc.orientation);
+            }
+        }
+
         isMoving = true;
     }
 
@@ -7284,6 +7306,14 @@ void Unit::OnRelocated()
  */
 void Unit::SetVehicleId(uint32 entry, uint32 overwriteNpcEntry)
 {
+    // Everyone off before the seats vanish: a passenger still boarded when
+    // the VehicleInfo is deleted keeps a freed TransportInfo and the server
+    // dies on its next touch.
+    if (m_vehicleInfo)
+    {
+        m_vehicleInfo->UnBoardAll();
+    }
+
     delete m_vehicleInfo;
 
     if (entry)
