@@ -37,6 +37,7 @@
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
 #include "SpellMgr.h"
+#include "SQLStorages.h"
 #include "QuestDef.h"
 #include "Player.h"
 #include "Creature.h"
@@ -1219,6 +1220,24 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
     if (pVictim->IsImmuneToAttacker(this))
     {
         damage = 0;
+    }
+
+    // Sparring: an NPC may neither kill its sparring partner nor push it below
+    // the partner's floor. Deliberately AFTER the unkillable clamp and using
+    // the same shape; unlike that one this does exempt self-damage, because a
+    // scripted self-kill must still resolve.
+    float fFloorPct = 0.0f;
+
+    if (pVictim->IsSparringWith(this, &fFloorPct))
+    {
+        if (damage >= health)
+        {
+            damage = health > 1 ? health - 1 : 0;
+        }
+        else if (pVictim->GetHealthPercent() <= fFloorPct)
+        {
+            damage = 0;
+        }
     }
 
     // Rage from Damage made (only from direct weapon damage)
@@ -3284,6 +3303,49 @@ bool Unit::IsImmuneToAttacker(Unit const* pAttacker) const
 }
 
 /**
+* Tells whether damage from an attacker is capped by a sparring floor.
+*
+* \arg \c pAttacker
+*   The unit dealing the damage. Players and anything they own spar with
+*   nobody - only creature-on-creature damage is capped.
+* \arg \c pFloorPct
+*   Filled with the health percentage the victim may not be pushed below.
+* \return
+*   true when the pair is a sparring pair.
+*/
+bool Unit::IsSparringWith(Unit const* pAttacker, float* pFloorPct /*= NULL*/) const
+{
+    if (!pAttacker || pAttacker == this)
+    {
+        return false;
+    }
+
+    if (GetTypeId() != TYPEID_UNIT || pAttacker->GetTypeId() != TYPEID_UNIT)
+    {
+        return false;
+    }
+
+    if (pAttacker->isCharmedOwnedByPlayerOrPlayer())
+    {
+        return false;
+    }
+
+    CreatureSparring const* pSparring =
+        sCreatureSparringStorage.LookupEntry<CreatureSparring>(GetEntry());
+
+    if (!pSparring)
+    {
+        return false;
+    }
+
+    if (pFloorPct)
+    {
+        *pFloorPct = pSparring->HealthLimitPct;
+    }
+
+    return true;
+}
+
 /**
  * @brief Starts attacking a victim.
  *
