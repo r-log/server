@@ -100,6 +100,7 @@ LogFilterData logFilterData[LOG_FILTER_COUNT] =
     { "db_scripts",          "LogFilter_DbScripts",          true  },
     { "deck_minions",        "LogFilter_DeckMinions",        true  },
     { "lfg",                 "LogFilter_Lfg",                true  },
+    { "playerbots",          "LogFilter_Playerbots",         true  },
 };
 
 /**

@@ -64,7 +64,7 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 elapsed)
         LoadGroupedBots();
     }
 
-    sLog.outBasic("Processing random bots...");
+    DEBUG_FILTER_LOG(LOG_FILTER_PLAYERBOTS, "Processing random bots...");
 
     uint32 cachedMin = GetEventValue(0, "config_min");
     uint32 cachedMax = GetEventValue(0, "config_max");
@@ -168,16 +168,13 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 elapsed)
     }
 
     // Internal scheduler status: keep it out of player chat (was broadcast via
-    // SendWorldText every pass = chat spam) and off the console at normal levels.
-    sLog.outDetail("Random bots processed; next pass in %u seconds",
+    // SendWorldText every pass = chat spam) and behind a log filter, since a
+    // pass runs every few seconds for the lifetime of the server.
+    DEBUG_FILTER_LOG(LOG_FILTER_PLAYERBOTS, "Random bots processed; next pass in %u seconds",
         overBudget ? sPlayerbotAIConfig.randomBotCatchupInterval : sPlayerbotAIConfig.randomBotUpdateInterval);
 
-    // PrintStats walks every bot and logs a full breakdown; running it on every
-    // pass floods the log, so emit it roughly once a minute.
-    if (processTicks % 12 == 0)
-    {
-        PrintStats();
-    }
+    // No roster breakdown on a timer: the per-bot login lines already show how
+    // many came up. `.rndbot stats` prints the full breakdown on demand.
 
     // Advance the pass counter. It was never incremented, so the "!processTicks"
     // startup-burst branch above ran on *every* pass -- forcing a full-bot-list

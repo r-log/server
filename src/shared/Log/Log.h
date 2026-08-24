@@ -88,9 +88,10 @@ enum LogFilters
     LOG_FILTER_DB_SCRIPTS         = 0x400000,               // 22 db_scripts command processing trace (execution, not errors)
     LOG_FILTER_DECK_MINIONS       = 0x800000,               // 23 minions drawn across a deck boundary: board, step ashore, reconcile
     LOG_FILTER_LFG                = 0x1000000,              // 24 Dungeon Finder / Raid Finder queue and proposal trace
+    LOG_FILTER_PLAYERBOTS         = 0x2000000,              // 25 Playerbot scheduler pass trace - one line per pass, every few seconds
 };
 
-#define LOG_FILTER_COUNT            25
+#define LOG_FILTER_COUNT            26
 
 /**
  * @brief Configuration data for individual log filters
